@@ -1,0 +1,19 @@
+fastapi>=0.110
+uvicorn[standard]>=0.27
+
+# Banco interno (controle de usuários/permissões/logs)
+sqlalchemy>=2.0
+alembic>=1.13
+psycopg[binary]>=3.1
+pydantic>=2.6
+pydantic-settings>=2.2
+
+# Banco Oracle (dados dos relatórios Protheus) + pandas
+oracledb>=2.0
+pandas>=2.0
+
+# Ler planilhas de apoio (CT2010)
+openpyxl>=3.1
+
+# Hash de senhas (usado na Etapa 2 em diante)
+passlib[bcrypt]>=1.7

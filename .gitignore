@@ -1,0 +1,52 @@
+# ---- Credenciais e env (NUNCA versionar) ----
+.env
+*.env
+!.env.example
+backend/.env
+
+# ---- Python ----
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
+env/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# ---- Node / frontend ----
+node_modules/
+dist/
+.vite/
+.turbo/
+*.local
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ---- Testes e dados gerados localmente ----
+# CSVs que caem no diretório durante testes com curl
+*.csv
+cookies.txt
+# Zips de distribuição (artefatos de build)
+*.zip
+*.tar.gz
+
+# ---- SO / IDE ----
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# ---- Logs do uvicorn / app em dev ----
+*.log
+
+# ---- Pasta de apoio (planilhas com dados reais da empresa) ----
+# As planilhas tb_APOIO/ contêm estrutura de contas e centros de custo
+# da Technocoat — NÃO devem ir pro GitHub.
+tb_APOIO/
