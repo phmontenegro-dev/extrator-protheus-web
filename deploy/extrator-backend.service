@@ -1,0 +1,75 @@
+[Unit]
+Description=Extrator Protheus — Backend (FastAPI/uvicorn)
+Documentation=https://github.com/montenegro-dev-ti/extrator-protheus-web
+# Sobe só depois da rede e do PostgreSQL. Se o Postgres ainda não respondeu,
+# o uvicorn vai até subir mas as queries falhariam no primeiro acesso.
+After=network-online.target postgresql.service
+Wants=network-online.target
+Requires=postgresql.service
+
+[Service]
+Type=exec
+# Usuário dedicado (sem shell de login). O deploy guide cria esse usuário.
+User=extrator
+Group=extrator
+
+# Diretório base. Todo o projeto vive sob /opt/extrator-protheus/.
+WorkingDirectory=/opt/extrator-protheus/backend
+
+# Variáveis vêm do .env (EnvironmentFile ignora linhas de comentário,
+# mas não interpreta aspas duplas — valores no .env ficam SEM aspas).
+EnvironmentFile=/opt/extrator-protheus/backend/.env
+
+# Uvicorn com proxy-headers: respeita X-Forwarded-For/Proto do Nginx,
+# essencial pra:
+#   - rate limit de login funcionar por IP real, não por 127.0.0.1
+#   - logs de acesso registrarem o IP verdadeiro
+#   - request.url.scheme refletir https (afeta decisões internas)
+# 4 workers = suporta 4 extrações pesadas em paralelo.
+ExecStart=/opt/extrator-protheus/backend/.venv/bin/uvicorn \
+    app.main:app \
+    --host 127.0.0.1 \
+    --port 8000 \
+    --workers 4 \
+    --proxy-headers \
+    --forwarded-allow-ips="127.0.0.1" \
+    --access-log \
+    --log-level info
+
+# Restart automático em caso de crash, com backoff.
+Restart=always
+RestartSec=5
+
+# Encerramento gracioso: espera até 30s cada worker terminar as requests
+# que estão rodando. Importante porque uma extração pode estar em curso.
+KillMode=mixed
+KillSignal=SIGTERM
+TimeoutStopSec=30
+
+# ==== Hardening ====
+# Nega escrita em qualquer lugar fora do working directory + /tmp.
+# ReadWritePaths lista caminhos onde o processo PODE escrever (útil pra
+# futuros logs/arquivos temporários — hoje nada escrito fora de memória).
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/extrator-protheus/backend
+# Limita capacidades do kernel (não precisa de nenhuma).
+CapabilityBoundingSet=
+AmbientCapabilities=
+# Restringe chamadas de sistema estranhas ao padrão de uma app Python.
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+
+# Logs vão pro journald automaticamente (`journalctl -u extrator-backend`).
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=extrator-backend
+
+# Limite de arquivos abertos (default do Ubuntu é 1024, pode ser pouco
+# se muitos usuários abrirem a app ao mesmo tempo).
+LimitNOFILE=4096
+
+[Install]
+WantedBy=multi-user.target

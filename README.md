@@ -143,7 +143,7 @@ Veja `backend/.env.example` para a lista completa. As principais:
 - [x] Painel admin (usuários, permissões, logs)
 - [x] 10 relatórios prontos migrados
 - [x] Relatório Livre
-- [ ] **Deploy em produção** (systemd + Nginx + build estático) ← próxima etapa
+- [x] **Deploy em produção** — ver [docs/DEPLOY_PRODUCAO.md](docs/DEPLOY_PRODUCAO.md)
 - [ ] Melhorias visuais e personalização
 - [ ] Tela "Código SQL" (consulta livre, para admins)
 - [ ] Extração assíncrona (job em background + barra de progresso)
