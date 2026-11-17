@@ -1,10 +1,11 @@
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
+import { BrowserRouter, Route, Routes } from 'react-router-dom'
 import { AuthProvider } from './auth/AuthContext'
 import { RedirectIfAuth, RequireAuth } from './auth/RequireAuth'
 import { RequireAdmin } from './auth/RequireAdmin'
 import { AppLayout } from './components/AppLayout'
 import Login from './pages/Login'
 import Menu from './pages/Menu'
+import NotFound from './pages/NotFound'
 import RelatorioGenerico from './pages/relatorios/RelatorioGenerico'
 import Admin from './pages/admin/Admin'
 import Usuarios from './pages/admin/Usuarios'
@@ -53,7 +54,10 @@ export default function App() {
           <Route path="/admin/usuarios" element={<Admin_><Usuarios /></Admin_>} />
           <Route path="/admin/usuarios/:id" element={<Admin_><UsuarioEditar /></Admin_>} />
           <Route path="/admin/logs" element={<Admin_><Logs /></Admin_>} />
-          <Route path="*" element={<Navigate to="/menu" replace />} />
+          {/* Qualquer URL desconhecida — página 404 dedicada (em vez de
+              redirecionar silenciosamente). O usuário vê o erro e pode
+              voltar/ir pro menu. */}
+          <Route path="*" element={<NotFound />} />
         </Routes>
       </AuthProvider>
     </BrowserRouter>

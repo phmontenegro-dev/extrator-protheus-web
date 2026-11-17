@@ -8,6 +8,8 @@ import {
   RelatorioInfo,
 } from '../../api/relatorios'
 import { mensagemErro } from '../../api/client'
+import { Skeleton } from '../../components/ui/skeleton'
+import { useToast } from '../../lib/toast'
 import FormLivre from './FormLivre'
 
 /**
@@ -69,8 +71,8 @@ export default function RelatorioGenerico() {
 
       {carregando && (
         <div className="space-y-4">
-          <div className="h-8 w-64 animate-pulse rounded bg-muted" />
-          <div className="h-48 animate-pulse rounded-lg bg-muted" />
+          <Skeleton className="h-8 w-64" />
+          <Skeleton className="h-48 rounded-lg" />
         </div>
       )}
 
@@ -111,6 +113,7 @@ export default function RelatorioGenerico() {
 // =============================================================================
 
 function FormularioExtracao({ relatorio }: { relatorio: RelatorioInfo }) {
+  const { toast } = useToast()
   const [erro, setErro] = useState<string | null>(null)
   const [extraindo, setExtraindo] = useState(false)
 
@@ -119,8 +122,19 @@ function FormularioExtracao({ relatorio }: { relatorio: RelatorioInfo }) {
     setExtraindo(true)
     try {
       await extrairRelatorio(relatorio.id, payload)
+      toast({
+        title: 'Extração concluída',
+        description: 'O download do CSV foi disparado pelo navegador.',
+        variant: 'success',
+      })
     } catch (e) {
-      setErro(mensagemErro(e, 'Falha ao extrair o relatório.'))
+      const msg = mensagemErro(e, 'Falha ao extrair o relatório.')
+      setErro(msg)
+      toast({
+        title: 'Falha na extração',
+        description: msg,
+        variant: 'destructive',
+      })
     } finally {
       setExtraindo(false)
     }

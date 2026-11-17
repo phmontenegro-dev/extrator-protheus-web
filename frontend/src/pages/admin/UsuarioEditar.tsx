@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { AlertCircle, CheckCircle2, Info } from 'lucide-react'
+import { AlertCircle, Info } from 'lucide-react'
 import { AdminLayout } from './AdminLayout'
 import {
   atualizarPermissoes,
@@ -17,6 +17,8 @@ import { Button } from '../../components/ui/button'
 import { Card } from '../../components/ui/card'
 import { Input } from '../../components/ui/input'
 import { Label } from '../../components/ui/label'
+import { Skeleton } from '../../components/ui/skeleton'
+import { useToast } from '../../lib/toast'
 
 export default function UsuarioEditar() {
   const { id } = useParams<{ id: string }>()
@@ -57,7 +59,11 @@ export default function UsuarioEditar() {
   if (carregando) {
     return (
       <AdminLayout titulo="Editar usuário" voltarPara="/admin/usuarios" rotuloVoltar="Usuários">
-        <p className="text-muted-foreground">Carregando...</p>
+        <div className="space-y-6">
+          <Skeleton className="h-64 w-full" />
+          <Skeleton className="h-96 w-full" />
+          <Skeleton className="h-48 w-full" />
+        </div>
       </AdminLayout>
     )
   }
@@ -117,15 +123,14 @@ function SecaoDados({
   souEu: boolean
   onSalvo: () => void
 }) {
+  const { toast } = useToast()
   const [nome, setNome] = useState(usuario.nome_completo)
   const [email, setEmail] = useState(usuario.email ?? '')
   const [isAdmin, setIsAdmin] = useState(usuario.is_admin)
   const [ativo, setAtivo] = useState(usuario.ativo)
   const [salvando, setSalvando] = useState(false)
-  const [erro, setErro] = useState<string | null>(null)
 
   const salvar = async () => {
-    setErro(null)
     setSalvando(true)
     try {
       await editarUsuario(usuario.id, {
@@ -134,9 +139,14 @@ function SecaoDados({
         is_admin: isAdmin,
         ativo,
       })
+      toast({ title: 'Dados atualizados', variant: 'success' })
       onSalvo()
     } catch (e) {
-      setErro(mensagemErro(e, 'Não foi possível salvar.'))
+      toast({
+        title: 'Não foi possível salvar',
+        description: mensagemErro(e, 'Erro inesperado.'),
+        variant: 'destructive',
+      })
     } finally {
       setSalvando(false)
     }
@@ -199,13 +209,6 @@ function SecaoDados({
         </label>
       </div>
 
-      {erro && (
-        <div className="mt-4 flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
-          <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
-          <span>{erro}</span>
-        </div>
-      )}
-
       <div className="mt-6">
         <Button onClick={salvar} disabled={salvando}>
           {salvando ? 'Salvando...' : 'Salvar dados'}
@@ -226,17 +229,15 @@ function SecaoPermissoes({
   permissoesIniciais: Set<string>
   onSalvo: () => void
 }) {
+  const { toast } = useToast()
   const [permissoes, setPermissoes] = useState<Set<string>>(permissoesIniciais)
   const [salvando, setSalvando] = useState(false)
-  const [erro, setErro] = useState<string | null>(null)
-  const [msg, setMsg] = useState<string | null>(null)
 
   const toggle = (id: string) => {
     const nova = new Set(permissoes)
     if (nova.has(id)) nova.delete(id)
     else nova.add(id)
     setPermissoes(nova)
-    setMsg(null)
   }
 
   const marcarTodos = () =>
@@ -244,15 +245,21 @@ function SecaoPermissoes({
   const limpar = () => setPermissoes(new Set())
 
   const salvar = async () => {
-    setErro(null)
-    setMsg(null)
     setSalvando(true)
     try {
       await atualizarPermissoes(usuario.id, Array.from(permissoes))
-      setMsg('Permissões atualizadas.')
+      toast({
+        title: 'Permissões atualizadas',
+        description: `${permissoes.size} ${permissoes.size === 1 ? 'relatório' : 'relatórios'} liberado(s).`,
+        variant: 'success',
+      })
       onSalvo()
     } catch (e) {
-      setErro(mensagemErro(e, 'Não foi possível salvar as permissões.'))
+      toast({
+        title: 'Falha ao salvar permissões',
+        description: mensagemErro(e, 'Erro inesperado.'),
+        variant: 'destructive',
+      })
     } finally {
       setSalvando(false)
     }
@@ -299,19 +306,6 @@ function SecaoPermissoes({
         </div>
       )}
 
-      {erro && (
-        <div className="mt-4 flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
-          <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
-          <span>{erro}</span>
-        </div>
-      )}
-      {msg && (
-        <div className="mt-4 flex items-start gap-2 rounded-md border border-success/30 bg-success/10 p-3 text-sm text-success">
-          <CheckCircle2 className="h-4 w-4 shrink-0 mt-0.5" />
-          <span>{msg}</span>
-        </div>
-      )}
-
       <div className="mt-6">
         <Button onClick={salvar} disabled={salvando}>
           {salvando ? 'Salvando...' : 'Salvar permissões'}
@@ -322,17 +316,18 @@ function SecaoPermissoes({
 }
 
 function SecaoResetarSenha({ usuarioId }: { usuarioId: number }) {
+  const { toast } = useToast()
   const [novaSenha, setNovaSenha] = useState('')
   const [confirmacao, setConfirmacao] = useState('')
   const [enviando, setEnviando] = useState(false)
-  const [erro, setErro] = useState<string | null>(null)
-  const [msg, setMsg] = useState<string | null>(null)
 
   const resetar = async () => {
-    setErro(null)
-    setMsg(null)
     if (novaSenha !== confirmacao) {
-      setErro('As senhas não conferem.')
+      toast({
+        title: 'Senhas não conferem',
+        description: 'Digite a mesma senha nos dois campos.',
+        variant: 'destructive',
+      })
       return
     }
     if (!window.confirm(
@@ -342,11 +337,19 @@ function SecaoResetarSenha({ usuarioId }: { usuarioId: number }) {
     setEnviando(true)
     try {
       await resetarSenha(usuarioId, novaSenha)
-      setMsg('Senha redefinida. Sessões ativas foram encerradas.')
+      toast({
+        title: 'Senha redefinida',
+        description: 'Sessões ativas foram encerradas. Avise o usuário.',
+        variant: 'success',
+      })
       setNovaSenha('')
       setConfirmacao('')
     } catch (e) {
-      setErro(mensagemErro(e, 'Não foi possível redefinir a senha.'))
+      toast({
+        title: 'Falha ao redefinir senha',
+        description: mensagemErro(e, 'Erro inesperado.'),
+        variant: 'destructive',
+      })
     } finally {
       setEnviando(false)
     }
@@ -379,19 +382,6 @@ function SecaoResetarSenha({ usuarioId }: { usuarioId: number }) {
           />
         </div>
       </div>
-
-      {erro && (
-        <div className="mt-4 flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
-          <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
-          <span>{erro}</span>
-        </div>
-      )}
-      {msg && (
-        <div className="mt-4 flex items-start gap-2 rounded-md border border-success/30 bg-success/10 p-3 text-sm text-success">
-          <CheckCircle2 className="h-4 w-4 shrink-0 mt-0.5" />
-          <span>{msg}</span>
-        </div>
-      )}
 
       <div className="mt-6">
         <Button

@@ -6,6 +6,7 @@ import { mensagemErro } from '../../api/client'
 import { Button } from '../../components/ui/button'
 import { Card } from '../../components/ui/card'
 import { Input } from '../../components/ui/input'
+import { Skeleton } from '../../components/ui/skeleton'
 
 const LIMITE = 50
 
@@ -139,13 +140,16 @@ export default function Logs() {
             </tr>
           </thead>
           <tbody>
-            {carregando && (
-              <tr>
-                <td colSpan={7} className="px-3 py-6 text-center text-muted-foreground">
-                  Carregando...
-                </td>
-              </tr>
-            )}
+            {carregando &&
+              [...Array(6)].map((_, i) => (
+                <tr key={i} className="border-t border-border">
+                  {[...Array(7)].map((_, j) => (
+                    <td key={j} className="px-3 py-2">
+                      <Skeleton className="h-3 w-full" />
+                    </td>
+                  ))}
+                </tr>
+              ))}
             {!carregando && itens.length === 0 && (
               <tr>
                 <td colSpan={7} className="px-3 py-6 text-center text-muted-foreground">

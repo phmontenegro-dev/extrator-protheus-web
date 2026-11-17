@@ -9,6 +9,8 @@ import { Button } from '../../components/ui/button'
 import { Card } from '../../components/ui/card'
 import { Input } from '../../components/ui/input'
 import { Label } from '../../components/ui/label'
+import { Skeleton } from '../../components/ui/skeleton'
+import { useToast } from '../../lib/toast'
 
 export default function Usuarios() {
   const navigate = useNavigate()
@@ -48,7 +50,20 @@ export default function Usuarios() {
         </Button>
       </div>
 
-      {carregando && <p className="text-muted-foreground">Carregando...</p>}
+      {carregando && (
+        <Card className="overflow-hidden">
+          <div className="p-4 space-y-3">
+            {[...Array(4)].map((_, i) => (
+              <div key={i} className="flex items-center gap-4">
+                <Skeleton className="h-4 w-24" />
+                <Skeleton className="h-4 flex-1" />
+                <Skeleton className="h-4 w-16" />
+                <Skeleton className="h-4 w-16" />
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
 
       {erro && (
         <div
@@ -137,6 +152,7 @@ function ModalNovoUsuario({
   onFechar: () => void
   onCriado: () => void
 }) {
+  const { toast } = useToast()
   const [username, setUsername] = useState('')
   const [nome, setNome] = useState('')
   const [email, setEmail] = useState('')
@@ -158,16 +174,24 @@ function ModalNovoUsuario({
     setErro(null)
     setEnviando(true)
     try {
+      const usernameLimpo = username.trim().toLowerCase()
       await criarUsuario({
-        username: username.trim().toLowerCase(),
+        username: usernameLimpo,
         nome_completo: nome.trim(),
         email: email.trim() || null,
         senha,
         is_admin: isAdmin,
         permissoes: isAdmin ? [] : Array.from(permissoes),
       })
+      toast({
+        title: 'Usuário criado',
+        description: `@${usernameLimpo} está pronto pra logar.`,
+        variant: 'success',
+      })
       onCriado()
     } catch (e) {
+      // Erro fica no modal (visível junto do form) em vez de toast —
+      // o usuário acabou de digitar e pode querer corrigir ali mesmo.
       setErro(mensagemErro(e, 'Não foi possível criar o usuário.'))
     } finally {
       setEnviando(false)
