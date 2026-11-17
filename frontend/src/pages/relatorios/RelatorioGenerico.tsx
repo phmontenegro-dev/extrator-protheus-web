@@ -5,7 +5,6 @@ import {
   FiltrosPayload,
   listarRelatorios,
   RelatorioInfo,
-  TipoFiltro,
 } from '../../api/relatorios'
 import { mensagemErro } from '../../api/client'
 import { useAuth } from '../../auth/AuthContext'

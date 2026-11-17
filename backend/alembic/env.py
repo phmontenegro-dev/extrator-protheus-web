@@ -2,14 +2,19 @@
 Alembic env.py customizado para:
   - Ler a URL do banco do .env (via app.config.get_settings).
   - Importar todos os models para que autogenerate detecte as tabelas.
+
+IMPORTANTE: NÃO passamos a URL pelo ConfigParser do Alembic
+(config.set_main_option). O ConfigParser trata `%` como caracter especial de
+interpolação — isso quebra quando a senha do banco contém caracteres que
+viram %XX na URL (ex: `@` → `%40`, `#` → `%23`). Em vez disso, criamos o
+engine direto via create_engine(), que aceita a URL como string literal.
 """
-import os
 import sys
 from logging.config import fileConfig
 from pathlib import Path
 
 from alembic import context
-from sqlalchemy import engine_from_config, pool
+from sqlalchemy import create_engine, pool
 
 # Coloca a raiz do backend no sys.path para importar `app.*` daqui.
 BACKEND_DIR = Path(__file__).resolve().parent.parent
@@ -26,17 +31,14 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# Injeta a URL do banco dinamicamente.
 settings = get_settings()
-config.set_main_option("sqlalchemy.url", settings.postgres_url)
-
 target_metadata = Base.metadata
 
 
 def run_migrations_offline() -> None:
-    url = config.get_main_option("sqlalchemy.url")
+    """Modo offline: usa a URL direto, sem conectar."""
     context.configure(
-        url=url,
+        url=settings.postgres_url,
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
@@ -46,11 +48,8 @@ def run_migrations_offline() -> None:
 
 
 def run_migrations_online() -> None:
-    connectable = engine_from_config(
-        config.get_section(config.config_ini_section, {}),
-        prefix="sqlalchemy.",
-        poolclass=pool.NullPool,
-    )
+    """Modo online: conecta no banco e aplica as migrations."""
+    connectable = create_engine(settings.postgres_url, poolclass=pool.NullPool)
     with connectable.connect() as connection:
         context.configure(connection=connection, target_metadata=target_metadata)
         with context.begin_transaction():

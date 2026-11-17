@@ -98,7 +98,7 @@ sudo mkdir -p /opt/extrator-protheus
 sudo chown $USER:$USER /opt/extrator-protheus
 cd /opt
 # Troque a URL pelo seu repositório GitHub
-git clone https://github.com/phmontenegro-dev/extrator-protheus-web.git extrator-protheus
+git clone https://github.com/montenegro-dev-ti/extrator-protheus-web.git extrator-protheus
 cd extrator-protheus
 
 # Transfere a posse pro usuário extrator (incluindo .git/)
