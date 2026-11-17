@@ -109,4 +109,12 @@ def tratar_dataframe(df: pd.DataFrame) -> pd.DataFrame:
 
     df_final = enriquecer_dataframe(df_final)
     df_final = df_final[[c for c in COLUNAS_FINAIS if c in df_final.columns]]
+
+    # Remove duplicatas 100% idênticas. Isso costuma acontecer quando o JOIN
+    # com CV3 retorna múltiplas linhas para o mesmo lançamento (ex: vários
+    # registros de rastreamento apontando para o mesmo RECNO da CT2). Como
+    # comparamos TODAS as colunas finais, linhas legítimas com NFs diferentes
+    # não são afetadas — só as que são cópias exatas.
+    df_final = df_final.drop_duplicates().reset_index(drop=True)
+
     return df_final

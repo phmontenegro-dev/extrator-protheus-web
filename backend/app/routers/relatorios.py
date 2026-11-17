@@ -43,6 +43,8 @@ from app.relatorios_prontos.sh6_suzano.extrair import extrair_sh6_suzano
 from app.relatorios_prontos.sh6_suzano.tratar import tratar_dataframe as tratar_sh6_suzano
 from app.relatorios_prontos.consolidado_suzano_jhon.extrair import extrair_consolidado_suzano_jhon
 from app.relatorios_prontos.consolidado_suzano_jhon.tratar import tratar_dataframe as tratar_consolidado_suzano_jhon
+from app.relatorios_prontos.paradas_maquina.extrair import extrair_paradas_maquina
+from app.relatorios_prontos.paradas_maquina.tratar import tratar_dataframe as tratar_paradas_maquina
 
 from app.schemas.relatorios import FiltrosFilialPeriodo, FiltrosPeriodo, RelatorioInfo
 from app.utils.permissoes import relatorios_permitidos
@@ -158,6 +160,21 @@ def consolidado_suzano_jhon(filtros: FiltrosPeriodo, request: Request,
         nome_arquivo=f"ConsolidadoSuzanoJhon_tratado_{di}_a_{df}.csv",
         extrair_fn=lambda: extrair_consolidado_suzano_jhon(di, df),
         tratar_fn=tratar_consolidado_suzano_jhon,
+        parametros_log={"data_inicio": di, "data_fim": df},
+    )
+
+
+@router.post("/paradas_maquina/extrair")
+def paradas_maquina(filtros: FiltrosPeriodo, request: Request,
+                    db: Session = Depends(get_db),
+                    usuario: Usuario = Depends(get_usuario_atual)) -> StreamingResponse:
+    di, df = filtros.para_aaaammdd()
+    return executar_e_responder_csv(
+        db=db, request=request, usuario=usuario,
+        relatorio_id="paradas_maquina",
+        nome_arquivo=f"ParadasMaquina_{di}_a_{df}.csv",
+        extrair_fn=lambda: extrair_paradas_maquina(di, df),
+        tratar_fn=tratar_paradas_maquina,
         parametros_log={"data_inicio": di, "data_fim": df},
     )
 

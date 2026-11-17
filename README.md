@@ -80,6 +80,12 @@ ExtratorProtheusWeb/
 
 Veja o guia completo em [docs/SETUP_UBUNTU.md](docs/SETUP_UBUNTU.md).
 
+## Documentação técnica
+
+- [Setup em Ubuntu (dev)](docs/SETUP_UBUNTU.md)
+- [Deploy em produção](docs/DEPLOY_PRODUCAO.md) · [Passo a passo iniciante](docs/DEPLOY_PASSO_A_PASSO.md)
+- [**Como adicionar um novo relatório pronto**](docs/COMO_ADICIONAR_RELATORIO.md) ← consulta durante o desenvolvimento
+
 Resumo:
 
 ```bash

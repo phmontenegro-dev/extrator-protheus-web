@@ -101,6 +101,17 @@ RELATORIOS: list[RelatorioInfo] = [
         ),
         "filtros": "periodo",
     },
+    {
+        "id": "paradas_maquina",
+        "nome": "Paradas de Máquina",
+        "descricao": (
+            "Cruza eventos de parada (SH6) com a produção em andamento no "
+            "mesmo recurso, por sobreposição temporal. Traz o motivo da "
+            "parada (CYN), a OP afetada, o operador, duração em minutos e "
+            "produto associado."
+        ),
+        "filtros": "periodo",
+    },
     # Relatório Livre não é um "relatório pronto" — é uma ferramenta de
     # extração ad hoc. Fica no registry por conveniência: aparece no menu,
     # no sistema de permissões e nos logs igual aos outros, mas tem rota

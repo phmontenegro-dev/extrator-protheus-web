@@ -9,6 +9,7 @@ import {
   Receipt,
   ScrollText,
   Sparkles,
+  Timer,
   Truck,
 } from 'lucide-react'
 import { listarRelatorios, RelatorioInfo } from '../api/relatorios'
@@ -32,6 +33,7 @@ const ICONES: Record<string, typeof FileSpreadsheet> = {
   sd4_suzano: Package,
   sh6_suzano: BarChart3,
   consolidado_suzano_jhon: BarChart3,
+  paradas_maquina: Timer,
   relatorio_livre: Sparkles,
 }
 
