@@ -9,5 +9,14 @@ from app.models.usuario import Usuario
 from app.models.permissao import PermissaoRelatorio
 from app.models.log_acesso import LogAcesso
 from app.models.sessao import Sessao
+from app.models.area import Area
+from app.models.relatorio_area import RelatorioArea
 
-__all__ = ["Usuario", "PermissaoRelatorio", "LogAcesso", "Sessao"]
+__all__ = [
+    "Usuario",
+    "PermissaoRelatorio",
+    "LogAcesso",
+    "Sessao",
+    "Area",
+    "RelatorioArea",
+]

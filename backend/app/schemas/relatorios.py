@@ -1,5 +1,5 @@
 from datetime import date
-from typing import Literal
+from typing import Literal, Optional
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -12,6 +12,11 @@ class RelatorioInfo(BaseModel):
     # Tipo de filtros que o frontend precisa renderizar.
     # Deve ficar em sincronia com TipoFiltro em relatorios_prontos/registry.py.
     filtros: Literal["nenhum", "periodo", "filial_periodo", "livre"]
+    # Área a que o relatório foi atribuído pelo admin (nullable → "Outros").
+    # O frontend agrupa o menu por essa info; ordenação segue area_ordem.
+    area_id: Optional[int] = None
+    area_nome: Optional[str] = None
+    area_ordem: Optional[int] = None
 
 
 # ---- Modelos de filtros ----

@@ -46,6 +46,8 @@ from app.relatorios_prontos.consolidado_suzano_jhon.tratar import tratar_datafra
 from app.relatorios_prontos.paradas_maquina.extrair import extrair_paradas_maquina
 from app.relatorios_prontos.paradas_maquina.tratar import tratar_dataframe as tratar_paradas_maquina
 
+from app.models.area import Area
+from app.models.relatorio_area import RelatorioArea
 from app.schemas.relatorios import FiltrosFilialPeriodo, FiltrosPeriodo, RelatorioInfo
 from app.utils.permissoes import relatorios_permitidos
 from app.utils.relatorio_runner import executar_e_responder_csv
@@ -63,11 +65,39 @@ def listar(
     db: Session = Depends(get_db),
     usuario: Usuario = Depends(get_usuario_atual),
 ) -> list[RelatorioInfo]:
-    """Admin vê todos; usuário comum só vê os em permissoes_relatorio."""
+    """
+    Admin vê todos; usuário comum só vê os em permissoes_relatorio.
+
+    Cada relatório retorna também sua área atribuída (area_id, area_nome,
+    area_ordem). Relatórios sem atribuição retornam None nos 3 campos, e
+    o frontend os exibe na seção "Outros".
+    """
+    # Carrega todas as atribuições relatório→área em uma query só (inner join
+    # com Area). Dict por relatorio_id pra lookup O(1).
+    mapa_area: dict[str, tuple[int, str, int]] = {}
+    for rel, area in (
+        db.query(RelatorioArea, Area)
+        .join(Area, Area.id == RelatorioArea.area_id)
+        .all()
+    ):
+        mapa_area[rel.relatorio_id] = (area.id, area.nome, area.ordem)
+
     if usuario.is_admin:
-        return [RelatorioInfo(**r) for r in RELATORIOS]
-    permitidos = relatorios_permitidos(db, usuario)
-    return [RelatorioInfo(**r) for r in RELATORIOS if r["id"] in permitidos]
+        base = RELATORIOS
+    else:
+        permitidos = relatorios_permitidos(db, usuario)
+        base = [r for r in RELATORIOS if r["id"] in permitidos]
+
+    resultado: list[RelatorioInfo] = []
+    for r in base:
+        area_info = mapa_area.get(r["id"])
+        resultado.append(RelatorioInfo(
+            **r,
+            area_id=area_info[0] if area_info else None,
+            area_nome=area_info[1] if area_info else None,
+            area_ordem=area_info[2] if area_info else None,
+        ))
+    return resultado
 
 
 # =============================================================================
