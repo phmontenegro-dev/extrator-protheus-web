@@ -31,6 +31,62 @@ LOTES_EXCLUIDOS = [
 ]
 
 
+def _consolidar_continuacoes_hist(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Reagrupa continuações de histórico à linha "pai" do mesmo documento.
+
+    No Protheus, o campo CT2_HIST é CHAR(40). Quando o texto do histórico passa
+    desse limite, o sistema cria linhas adicionais com CT2_DC='4' e valor zero,
+    contendo apenas a continuação do texto. Elas não são lançamentos reais —
+    servem só para estender o histórico da linha anterior do mesmo documento.
+
+    Esta função:
+      1. Ordena por (FILIAL, LOTE, DOC, LINHA) — assim as continuações ficam
+         logo após a linha principal correspondente.
+      2. Para cada linha com CT2_DC='4', encontra a última linha principal
+         (CT2_DC != '4') vista no mesmo (FILIAL, LOTE, DOC) e concatena o
+         texto nela.
+      3. Remove as linhas com CT2_DC='4' do DataFrame.
+
+    IMPORTANTE: precisa rodar ANTES do split de partida dobrada, para que
+    continuações não causem efeitos colaterais na duplicação de linhas.
+    """
+    if df.empty or "CT2_DC" not in df.columns:
+        return df
+
+    df = df.copy()
+    df["CT2_DC"] = df["CT2_DC"].astype(str).str.strip()
+    df = df.sort_values(
+        ["CT2_FILIAL", "CT2_LOTE", "CT2_DOC", "CT2_LINHA"],
+        kind="stable",
+    ).reset_index(drop=True)
+
+    eh_cont = (df["CT2_DC"] == "4").to_numpy()
+
+    # Usamos listas em vez de .at/.iat dentro do loop por performance:
+    # em datasets grandes (centenas de milhares de linhas) isso é 50x+ rápido.
+    filiais = df["CT2_FILIAL"].astype(str).tolist()
+    lotes = df["CT2_LOTE"].astype(str).tolist()
+    docs = df["CT2_DOC"].astype(str).tolist()
+    hists = df["CT2_HIST"].astype(str).tolist()
+
+    ancora_por_grupo: dict[tuple[str, str, str], int] = {}
+    for i in range(len(df)):
+        chave = (filiais[i], lotes[i], docs[i])
+        if eh_cont[i]:
+            ancora = ancora_por_grupo.get(chave)
+            if ancora is not None:
+                # Concatena sem separador — o Protheus corta exatamente no
+                # 40º char e a continuação começa no 41º, sem espaço.
+                hists[ancora] = (hists[ancora] or "") + (hists[i] or "")
+        else:
+            ancora_por_grupo[chave] = i
+
+    df["CT2_HIST"] = hists
+    df = df[~eh_cont].reset_index(drop=True)
+    return df
+
+
 def enriquecer_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     mapa_pacote, mapa_desc_conta = carregar_plano_contas()
     mapa_resp, mapa_desc_cc, mapa_custo_despesa = carregar_centro_custo()
@@ -63,6 +119,11 @@ def tratar_dataframe(df: pd.DataFrame) -> pd.DataFrame:
                 "CLI_FOR", "LOJA", "NOME_CLIFOR", "RAZAO_SOCIAL"]:
         if col in df.columns:
             df[col] = df[col].astype(str).str.strip()
+
+    # Consolida continuações do histórico (CT2_DC='4') nas linhas pai.
+    # Precisa rodar antes de TUDO: lotes excluídos não afetam, e precisamos
+    # das continuações agregadas antes do split de partida dobrada.
+    df = _consolidar_continuacoes_hist(df)
 
     # Exclusão de lotes
     df = df[~df["CT2_LOTE"].isin(LOTES_EXCLUIDOS)].copy()

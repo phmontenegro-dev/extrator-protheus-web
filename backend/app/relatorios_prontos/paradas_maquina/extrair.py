@@ -106,7 +106,7 @@ def extrair_paradas_maquina(data_inicio: str, data_fim: str) -> pd.DataFrame:
                     TRIM(P.H6_PRODUTO) IS NULL
                     OR P.H6_PRODUTO = PR.H6_PRODUTO
                 )
-            LEFT JOIN CYN C
+            LEFT JOIN CYN010 C
                 ON TRIM(C.CYN_CDSP) = TRIM(P.H6_MOTIVO)
                 AND C.D_E_L_E_T_ = ' '
         WHERE P.H6_DATAFIN BETWEEN :data_inicio AND :data_fim

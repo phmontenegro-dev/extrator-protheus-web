@@ -144,6 +144,13 @@ def extrair_meu_relatorio(filial: str, data_inicio: str, data_fim: str) -> pd.Da
 - **Sempre** use bind variables (`:data_inicio`) para valores — nunca interpole.
 - Faça `strip()` nos códigos para preservar zeros à esquerda.
 - Fechar a conexão com `conn.close()` dentro do `finally`.
+- **Nomes de tabela Protheus sempre têm sufixo `010`** (empresa 01, filial 0):
+  `SB1010`, `SH6010`, `CYN010`, etc. Se um SELECT recebido de outra ferramenta
+  (Totvs Query, ADV/PL) cita a tabela sem o sufixo, confirme no dicionário
+  Oracle antes de rodar:
+  ```sql
+  SELECT table_name FROM all_tables WHERE table_name LIKE 'XXX%' ORDER BY table_name;
+  ```
 
 ## Passo 3 — Criar `tratar.py`
 
