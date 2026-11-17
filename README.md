@@ -147,6 +147,10 @@ Veja `backend/.env.example` para a lista completa. As principais:
 - [ ] Melhorias visuais e personalização
 - [ ] Tela "Código SQL" (consulta livre, para admins)
 - [ ] Extração assíncrona (job em background + barra de progresso)
+- [ ] Filtros dinâmicos no Relatório Livre (operadores por tipo de coluna:
+      `=`, `>`, `<`, `LIKE`, `BETWEEN`, `IN`) além do filtro de data
+- [ ] Dashboards com gráficos de relatórios pré-definidos (visões analíticas
+      configuráveis, ex: custos, produção, saldo de estoque)
 
 ## Autor
 

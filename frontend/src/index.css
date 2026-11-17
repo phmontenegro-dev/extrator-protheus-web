@@ -1,13 +1,109 @@
+/* Inter — fonte moderna, excelente pra UI. Variantes 400 (normal), 500
+   (medium), 600 (semibold), 700 (bold). */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-body {
-  @apply bg-slate-50 text-slate-900 antialiased;
-}
+@layer base {
+  /* ============================================================
+     TEMA — Technocoat
+     Cores base (em HSL, que é como Tailwind espera pros tokens):
+       Light background : #f9f9f9   → hsl(0 0% 98%)
+       Light primary    : #3cd070   → hsl(140 61% 53%)   (verde Technocoat)
+       Dark  background : #383838   → hsl(0 0% 22%)
+       Dark  surface    : #3b3c36   → hsl(69 4% 23%)     (black olive)
 
-@media (prefers-color-scheme: dark) {
+     Troque essas vars pra re-tematizar TODO o app em 1 lugar.
+     ============================================================ */
+
+  :root {
+    /* Paleta clara */
+    --background: 0 0% 98%;              /* #f9f9f9 */
+    --foreground: 0 0% 13%;              /* preto suave pro texto */
+
+    --surface: 0 0% 100%;                /* branco puro p/ cards */
+    --surface-foreground: 0 0% 13%;
+
+    --primary: 140 61% 53%;              /* #3cd070 verde */
+    --primary-foreground: 0 0% 100%;     /* texto branco sobre o verde */
+
+    --secondary: 0 0% 94%;               /* cinza muito claro */
+    --secondary-foreground: 0 0% 15%;
+
+    --muted: 0 0% 94%;
+    --muted-foreground: 0 0% 40%;
+
+    --accent: 140 61% 95%;               /* verde super claro p/ hover */
+    --accent-foreground: 140 61% 25%;    /* verde escuro p/ texto */
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+
+    --success: 140 61% 45%;
+    --success-foreground: 0 0% 100%;
+
+    --border: 0 0% 90%;
+    --input: 0 0% 92%;
+    --ring: 140 61% 53%;                 /* foco com verde */
+
+    --radius: 0.625rem;                  /* 10px — curvas suaves */
+  }
+
+  .dark {
+    /* Paleta escura */
+    --background: 0 0% 22%;              /* #383838 */
+    --foreground: 0 0% 95%;              /* branco suave */
+
+    --surface: 69 4% 23%;                /* #3b3c36 black olive */
+    --surface-foreground: 0 0% 95%;
+
+    --primary: 140 61% 53%;              /* mesmo verde */
+    --primary-foreground: 0 0% 10%;      /* texto escuro sobre verde claro */
+
+    --secondary: 0 0% 28%;
+    --secondary-foreground: 0 0% 90%;
+
+    --muted: 0 0% 28%;
+    --muted-foreground: 0 0% 65%;
+
+    --accent: 140 50% 20%;               /* verde escuro p/ hover */
+    --accent-foreground: 140 61% 80%;
+
+    --destructive: 0 62% 50%;
+    --destructive-foreground: 0 0% 100%;
+
+    --success: 140 61% 45%;
+    --success-foreground: 0 0% 100%;
+
+    --border: 0 0% 30%;
+    --input: 0 0% 30%;
+    --ring: 140 61% 53%;
+  }
+
+  * {
+    @apply border-border;
+  }
+
   body {
-    @apply bg-slate-950 text-slate-100;
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: 'cv11', 'ss01';  /* variantes tipográficas do Inter */
+  }
+
+  /* Scrollbar discreta no dark mode */
+  .dark ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  .dark ::-webkit-scrollbar-track {
+    background: hsl(var(--background));
+  }
+  .dark ::-webkit-scrollbar-thumb {
+    background: hsl(var(--muted));
+    border-radius: 5px;
+  }
+  .dark ::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--muted-foreground));
   }
 }

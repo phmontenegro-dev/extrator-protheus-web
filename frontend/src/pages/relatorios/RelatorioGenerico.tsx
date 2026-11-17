@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
+import { ChevronLeft } from 'lucide-react'
 import {
   extrairRelatorio,
   FiltrosPayload,
@@ -7,7 +8,6 @@ import {
   RelatorioInfo,
 } from '../../api/relatorios'
 import { mensagemErro } from '../../api/client'
-import { useAuth } from '../../auth/AuthContext'
 import FormLivre from './FormLivre'
 
 /**
@@ -26,7 +26,6 @@ import FormLivre from './FormLivre'
 export default function RelatorioGenerico() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
-  const { usuario, logout } = useAuth()
 
   const [relatorio, setRelatorio] = useState<RelatorioInfo | null>(null)
   const [carregando, setCarregando] = useState(true)
@@ -59,61 +58,50 @@ export default function RelatorioGenerico() {
   }, [id])
 
   return (
-    <div className="min-h-screen">
-      <header className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800">
-        <div className="max-w-3xl mx-auto px-6 py-4 flex items-center justify-between">
+    <div className="mx-auto max-w-3xl px-6 py-8 md:py-10">
+      <button
+        onClick={() => navigate('/menu')}
+        className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-6"
+      >
+        <ChevronLeft className="h-4 w-4" />
+        <span>Menu</span>
+      </button>
+
+      {carregando && (
+        <div className="space-y-4">
+          <div className="h-8 w-64 animate-pulse rounded bg-muted" />
+          <div className="h-48 animate-pulse rounded-lg bg-muted" />
+        </div>
+      )}
+
+      {erroCarregamento && (
+        <div
+          role="alert"
+          className="rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive"
+        >
+          <p>{erroCarregamento}</p>
           <button
             onClick={() => navigate('/menu')}
-            className="text-sm text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100"
+            className="text-xs underline mt-3"
           >
-            ← Menu
+            Voltar ao menu
           </button>
-          <h1 className="text-lg font-semibold text-center flex-1 px-4 truncate">
-            {relatorio?.nome ?? 'Relatório'}
-          </h1>
-          <div className="flex items-center gap-2 text-sm">
-            <span className="text-slate-500 dark:text-slate-400 text-xs hidden sm:inline">
-              @{usuario?.username}
-            </span>
-            <button
-              onClick={logout}
-              className="px-3 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 text-xs hover:bg-slate-100 dark:hover:bg-slate-800"
-            >
-              Sair
-            </button>
-          </div>
         </div>
-      </header>
+      )}
 
-      <main className="max-w-3xl mx-auto px-6 py-10">
-        {carregando && <p className="text-slate-500">Carregando relatório...</p>}
-
-        {erroCarregamento && (
-          <div
-            role="alert"
-            className="bg-red-100 dark:bg-red-950/40 text-red-700 dark:text-red-300 text-sm rounded-lg p-4"
-          >
-            {erroCarregamento}
-            <div className="mt-3">
-              <button
-                onClick={() => navigate('/menu')}
-                className="text-xs underline"
-              >
-                Voltar ao menu
-              </button>
-            </div>
-          </div>
-        )}
-
-        {relatorio && (
-          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-lg p-8">
-            <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">
+      {relatorio && (
+        <>
+          <div className="mb-6">
+            <h1 className="text-2xl font-bold tracking-tight">{relatorio.nome}</h1>
+            <p className="text-sm text-muted-foreground mt-2">
               {relatorio.descricao}
             </p>
+          </div>
+          <div className="rounded-lg border border-border bg-surface shadow-sm p-6 md:p-8">
             <FormularioExtracao relatorio={relatorio} />
           </div>
-        )}
-      </main>
+        </>
+      )}
     </div>
   )
 }

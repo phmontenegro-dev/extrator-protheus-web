@@ -1,103 +1,127 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useAuth } from '../auth/AuthContext'
+import {
+  BarChart3,
+  Beaker,
+  Boxes,
+  FileSpreadsheet,
+  Package,
+  Receipt,
+  ScrollText,
+  Sparkles,
+  Truck,
+} from 'lucide-react'
 import { listarRelatorios, RelatorioInfo } from '../api/relatorios'
 import { mensagemErro } from '../api/client'
+import { Card, CardContent } from '../components/ui/card'
+import { cn } from '../lib/utils'
+
+/**
+ * Mapa opcional id → ícone. Um relatório sem entrada aqui ganha o ícone
+ * padrão FileSpreadsheet.
+ */
+const ICONES: Record<string, typeof FileSpreadsheet> = {
+  ct2010: ScrollText,
+  qpr010: Beaker,
+  sft010: Receipt,
+  sd3010: Boxes,
+  sb8_suzano: Package,
+  sd1_suzano: Truck,
+  sd2_suzano: Truck,
+  sd4_suzano: Package,
+  sh6_suzano: BarChart3,
+  consolidado_suzano_jhon: BarChart3,
+  relatorio_livre: Sparkles,
+}
 
 export default function Menu() {
-  const { usuario, logout } = useAuth()
   const navigate = useNavigate()
   const [relatorios, setRelatorios] = useState<RelatorioInfo[]>([])
   const [carregando, setCarregando] = useState(true)
   const [erro, setErro] = useState<string | null>(null)
 
   useEffect(() => {
-    let ativo = true
     listarRelatorios()
-      .then((r) => {
-        if (ativo) setRelatorios(r)
-      })
-      .catch((e) => {
-        if (ativo) setErro(mensagemErro(e, 'Não foi possível carregar os relatórios.'))
-      })
-      .finally(() => {
-        if (ativo) setCarregando(false)
-      })
-    return () => {
-      ativo = false
-    }
+      .then(setRelatorios)
+      .catch((e) =>
+        setErro(mensagemErro(e, 'Não foi possível carregar os relatórios.')),
+      )
+      .finally(() => setCarregando(false))
   }, [])
 
   return (
-    <div className="min-h-screen">
-      <header className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800">
-        <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
-          <h1 className="text-lg font-semibold">Extrator Protheus</h1>
-          <div className="flex items-center gap-4 text-sm">
-            <div className="text-right">
-              <div className="font-medium">{usuario?.nome_completo}</div>
-              <div className="text-slate-500 dark:text-slate-400 text-xs">
-                @{usuario?.username}
-                {usuario?.is_admin && (
-                  <span className="ml-2 px-2 py-0.5 rounded bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 text-[10px] font-semibold uppercase">
-                    admin
-                  </span>
-                )}
-              </div>
-            </div>
-            {usuario?.is_admin && (
-              <button
-                onClick={() => navigate('/admin')}
-                className="px-3 py-1.5 rounded-lg bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700"
-              >
-                Admin
-              </button>
-            )}
-            <button
-              onClick={logout}
-              className="px-3 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 text-sm hover:bg-slate-100 dark:hover:bg-slate-800"
-            >
-              Sair
-            </button>
-          </div>
-        </div>
-      </header>
+    <div className="mx-auto max-w-5xl px-6 py-8 md:py-10">
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold tracking-tight">Relatórios disponíveis</h1>
+        <p className="text-sm text-muted-foreground mt-1">
+          Selecione um relatório para configurar os filtros e extrair.
+        </p>
+      </div>
 
-      <main className="max-w-5xl mx-auto px-6 py-10">
-        <h2 className="text-xl font-semibold mb-4">Relatórios disponíveis</h2>
-
-        {carregando && <p className="text-slate-500">Carregando relatórios...</p>}
-
-        {erro && (
-          <div
-            role="alert"
-            className="bg-red-100 dark:bg-red-950/40 text-red-700 dark:text-red-300 text-sm rounded-lg p-4"
-          >
-            {erro}
-          </div>
-        )}
-
-        {!carregando && !erro && relatorios.length === 0 && (
-          <p className="text-slate-500">
-            Nenhum relatório disponível para seu usuário.
-          </p>
-        )}
-
+      {carregando && (
         <div className="grid gap-4 md:grid-cols-2">
-          {relatorios.map((r) => (
+          {[...Array(4)].map((_, i) => (
+            <Card key={i} className="h-28 animate-pulse" />
+          ))}
+        </div>
+      )}
+
+      {erro && (
+        <div
+          role="alert"
+          className="rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive"
+        >
+          {erro}
+        </div>
+      )}
+
+      {!carregando && !erro && relatorios.length === 0 && (
+        <Card className="p-8 text-center text-muted-foreground">
+          Nenhum relatório disponível. Fale com o administrador.
+        </Card>
+      )}
+
+      <div className="grid gap-4 md:grid-cols-2">
+        {relatorios.map((r) => {
+          const Icone = ICONES[r.id] ?? FileSpreadsheet
+          const destaque = r.filtros === 'livre'
+          return (
             <button
               key={r.id}
               onClick={() => navigate(`/relatorios/${r.id}`)}
-              className="text-left bg-white dark:bg-slate-900 rounded-xl shadow p-5 hover:shadow-md transition border border-transparent hover:border-slate-300 dark:hover:border-slate-700"
+              className="text-left"
             >
-              <div className="font-semibold mb-1">{r.nome}</div>
-              <div className="text-sm text-slate-500 dark:text-slate-400">
-                {r.descricao}
-              </div>
+              <Card
+                className={cn(
+                  'h-full transition-all hover:shadow-md hover:border-primary/40',
+                  destaque && 'border-primary/40 bg-primary/5',
+                )}
+              >
+                <CardContent className="p-5">
+                  <div className="flex items-start gap-3">
+                    <div
+                      className={cn(
+                        'flex h-10 w-10 shrink-0 items-center justify-center rounded-lg',
+                        destaque
+                          ? 'bg-primary text-primary-foreground'
+                          : 'bg-accent text-accent-foreground',
+                      )}
+                    >
+                      <Icone className="h-5 w-5" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="font-semibold truncate">{r.nome}</div>
+                      <div className="text-sm text-muted-foreground mt-1 line-clamp-2">
+                        {r.descricao}
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
             </button>
-          ))}
-        </div>
-      </main>
+          )
+        })}
+      </div>
     </div>
   )
 }

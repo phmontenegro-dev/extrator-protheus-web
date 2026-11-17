@@ -2,6 +2,7 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { AuthProvider } from './auth/AuthContext'
 import { RedirectIfAuth, RequireAuth } from './auth/RequireAuth'
 import { RequireAdmin } from './auth/RequireAdmin'
+import { AppLayout } from './components/AppLayout'
 import Login from './pages/Login'
 import Menu from './pages/Menu'
 import RelatorioGenerico from './pages/relatorios/RelatorioGenerico'
@@ -9,6 +10,26 @@ import Admin from './pages/admin/Admin'
 import Usuarios from './pages/admin/Usuarios'
 import UsuarioEditar from './pages/admin/UsuarioEditar'
 import Logs from './pages/admin/Logs'
+
+/**
+ * Login e 404 não usam o AppLayout (não têm sidebar).
+ * Tudo mais fica envolvido em <AppLayout> via um pequeno wrapper.
+ */
+function Protegida({ children }: { children: React.ReactNode }) {
+  return (
+    <RequireAuth>
+      <AppLayout>{children}</AppLayout>
+    </RequireAuth>
+  )
+}
+
+function Admin_({ children }: { children: React.ReactNode }) {
+  return (
+    <RequireAdmin>
+      <AppLayout>{children}</AppLayout>
+    </RequireAdmin>
+  )
+}
 
 export default function App() {
   return (
@@ -23,61 +44,15 @@ export default function App() {
               </RedirectIfAuth>
             }
           />
-          <Route
-            path="/menu"
-            element={
-              <RequireAuth>
-                <Menu />
-              </RequireAuth>
-            }
-          />
-          {/* Rota única para TODOS os relatórios — o :id carrega a metadata
-              do registry e a página renderiza o formulário certo pelo tipo
-              de filtro. Vale para ct2010, qpr010, sft010, sd3010 e Suzano. */}
+          <Route path="/menu" element={<Protegida><Menu /></Protegida>} />
           <Route
             path="/relatorios/:id"
-            element={
-              <RequireAuth>
-                <RelatorioGenerico />
-              </RequireAuth>
-            }
+            element={<Protegida><RelatorioGenerico /></Protegida>}
           />
-
-          {/* Rotas administrativas */}
-          <Route
-            path="/admin"
-            element={
-              <RequireAdmin>
-                <Admin />
-              </RequireAdmin>
-            }
-          />
-          <Route
-            path="/admin/usuarios"
-            element={
-              <RequireAdmin>
-                <Usuarios />
-              </RequireAdmin>
-            }
-          />
-          <Route
-            path="/admin/usuarios/:id"
-            element={
-              <RequireAdmin>
-                <UsuarioEditar />
-              </RequireAdmin>
-            }
-          />
-          <Route
-            path="/admin/logs"
-            element={
-              <RequireAdmin>
-                <Logs />
-              </RequireAdmin>
-            }
-          />
-
-          {/* Qualquer outra rota -> /menu (que decide login vs menu). */}
+          <Route path="/admin" element={<Admin_><Admin /></Admin_>} />
+          <Route path="/admin/usuarios" element={<Admin_><Usuarios /></Admin_>} />
+          <Route path="/admin/usuarios/:id" element={<Admin_><UsuarioEditar /></Admin_>} />
+          <Route path="/admin/logs" element={<Admin_><Logs /></Admin_>} />
           <Route path="*" element={<Navigate to="/menu" replace />} />
         </Routes>
       </AuthProvider>
