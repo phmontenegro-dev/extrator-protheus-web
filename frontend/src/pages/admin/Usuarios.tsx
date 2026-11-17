@@ -1,9 +1,14 @@
 import { FormEvent, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { AlertCircle, Plus, X } from 'lucide-react'
 import { AdminLayout } from './AdminLayout'
 import { criarUsuario, listarUsuarios, UsuarioDetalhe } from '../../api/admin'
 import { listarRelatorios, RelatorioInfo } from '../../api/relatorios'
 import { mensagemErro } from '../../api/client'
+import { Button } from '../../components/ui/button'
+import { Card } from '../../components/ui/card'
+import { Input } from '../../components/ui/input'
+import { Label } from '../../components/ui/label'
 
 export default function Usuarios() {
   const navigate = useNavigate()
@@ -34,32 +39,31 @@ export default function Usuarios() {
   return (
     <AdminLayout titulo="Usuários" voltarPara="/admin" rotuloVoltar="Painel">
       <div className="flex items-center justify-between mb-4">
-        <p className="text-sm text-slate-500 dark:text-slate-400">
+        <p className="text-sm text-muted-foreground">
           {usuarios.length} {usuarios.length === 1 ? 'usuário' : 'usuários'}
         </p>
-        <button
-          onClick={() => setModalAberta(true)}
-          className="bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 rounded-lg px-4 py-2 text-sm font-medium"
-        >
-          + Novo usuário
-        </button>
+        <Button onClick={() => setModalAberta(true)}>
+          <Plus className="h-4 w-4" />
+          Novo usuário
+        </Button>
       </div>
 
-      {carregando && <p className="text-slate-500">Carregando...</p>}
+      {carregando && <p className="text-muted-foreground">Carregando...</p>}
 
       {erro && (
         <div
           role="alert"
-          className="bg-red-100 dark:bg-red-950/40 text-red-700 dark:text-red-300 text-sm rounded-lg p-3 mb-4"
+          className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive mb-4"
         >
-          {erro}
+          <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+          <span>{erro}</span>
         </div>
       )}
 
       {!carregando && !erro && (
-        <div className="bg-white dark:bg-slate-900 rounded-xl shadow overflow-hidden">
+        <Card className="overflow-hidden">
           <table className="w-full text-sm">
-            <thead className="bg-slate-50 dark:bg-slate-800 text-left text-xs uppercase text-slate-500 dark:text-slate-400">
+            <thead className="bg-muted text-left text-xs uppercase text-muted-foreground">
               <tr>
                 <th className="px-4 py-3">Usuário</th>
                 <th className="px-4 py-3">Nome</th>
@@ -71,29 +75,26 @@ export default function Usuarios() {
             </thead>
             <tbody>
               {usuarios.map((u) => (
-                <tr
-                  key={u.id}
-                  className="border-t border-slate-100 dark:border-slate-800"
-                >
+                <tr key={u.id} className="border-t border-border">
                   <td className="px-4 py-3 font-mono">{u.username}</td>
                   <td className="px-4 py-3">{u.nome_completo}</td>
                   <td className="px-4 py-3">
                     {u.is_admin ? (
-                      <span className="px-2 py-0.5 rounded bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 text-xs font-semibold">
+                      <span className="px-2 py-0.5 rounded bg-primary/15 text-primary text-xs font-semibold">
                         admin
                       </span>
                     ) : (
-                      <span className="text-slate-400">—</span>
+                      <span className="text-muted-foreground">—</span>
                     )}
                   </td>
                   <td className="px-4 py-3">
                     {u.ativo ? (
-                      <span className="text-emerald-600 dark:text-emerald-400">Ativo</span>
+                      <span className="text-success">Ativo</span>
                     ) : (
-                      <span className="text-slate-400">Inativo</span>
+                      <span className="text-muted-foreground">Inativo</span>
                     )}
                   </td>
-                  <td className="px-4 py-3 text-slate-500 text-xs">
+                  <td className="px-4 py-3 text-muted-foreground text-xs">
                     {u.ultimo_login
                       ? new Date(u.ultimo_login).toLocaleString('pt-BR')
                       : 'nunca'}
@@ -101,7 +102,7 @@ export default function Usuarios() {
                   <td className="px-4 py-3 text-right">
                     <button
                       onClick={() => navigate(`/admin/usuarios/${u.id}`)}
-                      className="text-sm text-indigo-600 dark:text-indigo-400 hover:underline"
+                      className="text-sm text-primary hover:underline"
                     >
                       Editar
                     </button>
@@ -110,7 +111,7 @@ export default function Usuarios() {
               ))}
             </tbody>
           </table>
-        </div>
+        </Card>
       )}
 
       {modalAberta && (
@@ -175,62 +176,72 @@ function ModalNovoUsuario({
 
   return (
     <div
-      className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50"
+      className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50"
       onClick={onFechar}
     >
-      <div
-        className="bg-white dark:bg-slate-900 rounded-2xl shadow-xl w-full max-w-lg p-6"
+      <Card
+        className="w-full max-w-lg p-6"
         onClick={(e) => e.stopPropagation()}
       >
-        <h2 className="text-lg font-semibold mb-4">Novo usuário</h2>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold">Novo usuário</h2>
+          <button
+            onClick={onFechar}
+            className="text-muted-foreground hover:text-foreground"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
         <form onSubmit={submeter} className="space-y-3">
-          <div>
-            <label className="block text-sm font-medium mb-1">Username</label>
-            <input
+          <div className="space-y-2">
+            <Label htmlFor="n-username">Username</Label>
+            <Input
+              id="n-username"
               type="text"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               required
-              className="w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2"
             />
           </div>
-          <div>
-            <label className="block text-sm font-medium mb-1">Nome completo</label>
-            <input
+          <div className="space-y-2">
+            <Label htmlFor="n-nome">Nome completo</Label>
+            <Input
+              id="n-nome"
               type="text"
               value={nome}
               onChange={(e) => setNome(e.target.value)}
               required
-              className="w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2"
             />
           </div>
-          <div>
-            <label className="block text-sm font-medium mb-1">
-              Email <span className="text-slate-400 text-xs">(opcional)</span>
-            </label>
-            <input
+          <div className="space-y-2">
+            <Label htmlFor="n-email">
+              Email <span className="text-muted-foreground text-xs">(opcional)</span>
+            </Label>
+            <Input
+              id="n-email"
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2"
             />
           </div>
-          <div>
-            <label className="block text-sm font-medium mb-1">
+          <div className="space-y-2">
+            <Label htmlFor="n-senha">
               Senha{' '}
-              <span className="text-slate-400 text-xs">
+              <span className="text-muted-foreground text-xs">
                 (mín. 8 chars + 1 especial)
               </span>
-            </label>
-            <input
+            </Label>
+            <Input
+              id="n-senha"
               type="password"
               value={senha}
               onChange={(e) => setSenha(e.target.value)}
               required
-              className="w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2"
             />
           </div>
-          <label className="flex items-center gap-2 text-sm">
+
+          <label className="flex items-center gap-2 text-sm pt-2">
             <input
               type="checkbox"
               checked={isAdmin}
@@ -242,15 +253,13 @@ function ModalNovoUsuario({
 
           {!isAdmin && (
             <div>
-              <div className="text-sm font-medium mb-2">
-                Permissões por relatório
-              </div>
+              <div className="text-sm font-medium mb-2">Permissões por relatório</div>
               {relatoriosDisponiveis.length === 0 ? (
-                <p className="text-xs text-slate-500">
+                <p className="text-xs text-muted-foreground">
                   Nenhum relatório cadastrado no sistema.
                 </p>
               ) : (
-                <div className="space-y-1 border border-slate-200 dark:border-slate-700 rounded-lg p-3 max-h-40 overflow-y-auto">
+                <div className="space-y-1 border border-border rounded-lg p-3 max-h-40 overflow-y-auto">
                   {relatoriosDisponiveis.map((r) => (
                     <label key={r.id} className="flex items-start gap-2 text-sm">
                       <input
@@ -260,7 +269,7 @@ function ModalNovoUsuario({
                         className="mt-1 rounded"
                       />
                       <span>
-                        <span className="font-mono text-xs text-slate-500">
+                        <span className="font-mono text-xs text-muted-foreground">
                           {r.id}
                         </span>{' '}
                         — {r.nome}
@@ -273,29 +282,25 @@ function ModalNovoUsuario({
           )}
 
           {erro && (
-            <div className="bg-red-100 dark:bg-red-950/40 text-red-700 dark:text-red-300 text-sm rounded-lg p-3">
-              {erro}
+            <div
+              role="alert"
+              className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive"
+            >
+              <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+              <span>{erro}</span>
             </div>
           )}
 
           <div className="flex justify-end gap-2 pt-2">
-            <button
-              type="button"
-              onClick={onFechar}
-              className="px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-700 text-sm"
-            >
+            <Button type="button" variant="outline" onClick={onFechar}>
               Cancelar
-            </button>
-            <button
-              type="submit"
-              disabled={enviando}
-              className="px-4 py-2 rounded-lg bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 text-sm font-medium disabled:opacity-50"
-            >
+            </Button>
+            <Button type="submit" disabled={enviando}>
               {enviando ? 'Criando...' : 'Criar'}
-            </button>
+            </Button>
           </div>
         </form>
-      </div>
+      </Card>
     </div>
   )
 }

@@ -181,12 +181,12 @@ export default function FormLivre() {
   // ---- Render ----
 
   if (tabelasCarregando) {
-    return <p className="text-slate-500">Carregando lista de tabelas...</p>
+    return <p className="text-muted-foreground">Carregando lista de tabelas...</p>
   }
 
   if (erroGeral) {
     return (
-      <div className="bg-red-100 dark:bg-red-950/40 text-red-700 dark:text-red-300 text-sm rounded-lg p-3">
+      <div className="border border-destructive/30 bg-destructive/10 text-destructive text-sm rounded-lg p-3">
         {erroGeral}
       </div>
     )
@@ -210,7 +210,7 @@ export default function FormLivre() {
           onChange={(e) => setTabelaInput(e.target.value.toUpperCase())}
           disabled={extraindo}
           placeholder="Digite para filtrar (ex.: SB1010)"
-          className="w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 outline-none focus:ring-2 focus:ring-slate-400 disabled:opacity-50 font-mono"
+          className="w-full rounded-lg border border-border bg-surface px-3 py-2 outline-none focus:ring-2 focus:ring-ring disabled:opacity-50 font-mono"
         />
         <datalist id="lista-tabelas">
           {tabelas.map((t) => (
@@ -220,14 +220,14 @@ export default function FormLivre() {
           ))}
         </datalist>
         {tabelaSelecionada?.descricao && (
-          <p className="text-xs text-slate-500 mt-1">{tabelaSelecionada.descricao}</p>
+          <p className="text-xs text-muted-foreground mt-1">{tabelaSelecionada.descricao}</p>
         )}
         {nomeDigitadoENaoReconhecido && (
-          <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+          <p className="text-xs text-primary mt-1">
             Tabela não reconhecida. Escolha uma da lista.
           </p>
         )}
-        <p className="text-xs text-slate-500 mt-1">
+        <p className="text-xs text-muted-foreground mt-1">
           {tabelas.length} tabelas disponíveis.
         </p>
       </div>
@@ -242,14 +242,14 @@ export default function FormLivre() {
                 <button
                   type="button"
                   onClick={marcarTodas}
-                  className="px-2 py-1 rounded border border-slate-300 dark:border-slate-700"
+                  className="px-2 py-1 rounded border border-border"
                 >
                   Marcar todas
                 </button>
                 <button
                   type="button"
                   onClick={limparSelecao}
-                  className="px-2 py-1 rounded border border-slate-300 dark:border-slate-700"
+                  className="px-2 py-1 rounded border border-border"
                 >
                   Limpar
                 </button>
@@ -258,17 +258,17 @@ export default function FormLivre() {
           </div>
 
           {carregandoColunas && (
-            <p className="text-sm text-slate-500">Carregando colunas...</p>
+            <p className="text-sm text-muted-foreground">Carregando colunas...</p>
           )}
           {erroColunas && (
-            <div className="bg-red-100 dark:bg-red-950/40 text-red-700 dark:text-red-300 text-sm rounded-lg p-3">
+            <div className="border border-destructive/30 bg-destructive/10 text-destructive text-sm rounded-lg p-3">
               {erroColunas}
             </div>
           )}
 
           {!carregandoColunas && !erroColunas && (
             <>
-              <div className="border border-slate-200 dark:border-slate-700 rounded-lg p-3 max-h-72 overflow-y-auto grid grid-cols-2 md:grid-cols-3 gap-y-1 gap-x-3">
+              <div className="border border-border rounded-lg p-3 max-h-72 overflow-y-auto grid grid-cols-2 md:grid-cols-3 gap-y-1 gap-x-3">
                 {colunasDisponiveis.map((c) => (
                   <label key={c} className="flex items-center gap-2 text-xs font-mono">
                     <input
@@ -281,7 +281,7 @@ export default function FormLivre() {
                   </label>
                 ))}
               </div>
-              <p className="text-xs text-slate-500 mt-1">
+              <p className="text-xs text-muted-foreground mt-1">
                 {colunasSelecionadas.size} selecionadas / {colunasDisponiveis.length} disponíveis.
                 Campos binários (BLOB, LONG, RAW) são ocultados automaticamente.
               </p>
@@ -302,7 +302,7 @@ export default function FormLivre() {
               value={campoData}
               onChange={(e) => setCampoData(e.target.value)}
               disabled={extraindo}
-              className="w-full md:w-80 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 font-mono text-sm"
+              className="w-full md:w-80 rounded-lg border border-border bg-surface px-3 py-2 font-mono text-sm"
             >
               <option value="">(sem filtro de data)</option>
               {colunasDisponiveis.map((c) => (
@@ -311,7 +311,7 @@ export default function FormLivre() {
                 </option>
               ))}
             </select>
-            <p className="text-xs text-slate-500 mt-1">
+            <p className="text-xs text-muted-foreground mt-1">
               Escolha a coluna que será usada no BETWEEN, ou deixe "(sem filtro de data)".
             </p>
           </div>
@@ -326,7 +326,7 @@ export default function FormLivre() {
                   value={dataInicio}
                   onChange={(e) => setDataInicio(e.target.value)}
                   disabled={extraindo}
-                  className="w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2"
+                  className="w-full rounded-lg border border-border bg-surface px-3 py-2"
                 />
               </div>
               <div>
@@ -337,7 +337,7 @@ export default function FormLivre() {
                   value={dataFim}
                   onChange={(e) => setDataFim(e.target.value)}
                   disabled={extraindo}
-                  className="w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2"
+                  className="w-full rounded-lg border border-border bg-surface px-3 py-2"
                 />
               </div>
             </div>
@@ -349,7 +349,7 @@ export default function FormLivre() {
       {tabelaSelecionada && colunasDisponiveis.length > 0 && (
         <div>
           <label htmlFor="max_linhas" className="block text-sm font-medium mb-1">
-            Máximo de linhas <span className="text-slate-400 text-xs">(opcional)</span>
+            Máximo de linhas <span className="text-muted-foreground text-xs">(opcional)</span>
           </label>
           <input
             id="max_linhas"
@@ -360,9 +360,9 @@ export default function FormLivre() {
             onChange={(e) => setMaxLinhas(e.target.value)}
             disabled={extraindo}
             placeholder="Sem limite"
-            className="w-full md:w-48 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2"
+            className="w-full md:w-48 rounded-lg border border-border bg-surface px-3 py-2"
           />
-          <p className="text-xs text-slate-500 mt-1">
+          <p className="text-xs text-muted-foreground mt-1">
             Aplica <span className="font-mono">ROWNUM &lt;= N</span>. Útil para teste rápido.
           </p>
         </div>
@@ -371,7 +371,7 @@ export default function FormLivre() {
       {erroExtracao && (
         <div
           role="alert"
-          className="bg-red-100 dark:bg-red-950/40 text-red-700 dark:text-red-300 text-sm rounded-lg p-3"
+          className="border border-destructive/30 bg-destructive/10 text-destructive text-sm rounded-lg p-3"
         >
           {erroExtracao}
         </div>
@@ -382,12 +382,12 @@ export default function FormLivre() {
           <button
             type="submit"
             disabled={extraindo || colunasSelecionadas.size === 0}
-            className="w-full md:w-auto px-6 bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 rounded-lg py-2 font-medium disabled:opacity-50"
+            className="w-full md:w-auto px-6 bg-primary text-primary-foreground rounded-lg py-2 font-medium disabled:opacity-50"
           >
             {extraindo ? 'Extraindo (pode levar alguns minutos)...' : 'Extrair CSV'}
           </button>
           {extraindo && (
-            <p className="text-xs text-slate-500 mt-2">
+            <p className="text-xs text-muted-foreground mt-2">
               Não feche esta aba.
             </p>
           )}

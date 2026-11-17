@@ -37,7 +37,7 @@ export function RedirectIfAuth({ children }: { children: ReactNode }) {
 function TelaCarregando() {
   return (
     <div className="min-h-screen flex items-center justify-center">
-      <div className="text-slate-500">Carregando...</div>
+      <div className="text-muted-foreground">Carregando...</div>
     </div>
   )
 }

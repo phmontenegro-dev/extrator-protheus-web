@@ -145,6 +145,8 @@ Veja `backend/.env.example` para a lista completa. As principais:
 - [x] Relatório Livre
 - [x] **Deploy em produção** — ver [docs/DEPLOY_PRODUCAO.md](docs/DEPLOY_PRODUCAO.md)
 - [ ] Melhorias visuais e personalização
+- [ ] Divisão de relatórios por área (ex: Contábil, Qualidade, Estoque,
+      Produção, Suzano) — menu agrupado por área, admin cadastra/edita áreas
 - [ ] Tela "Código SQL" (consulta livre, para admins)
 - [ ] Extração assíncrona (job em background + barra de progresso)
 - [ ] Filtros dinâmicos no Relatório Livre (operadores por tipo de coluna:

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
+import { AlertCircle, CheckCircle2, Info } from 'lucide-react'
 import { AdminLayout } from './AdminLayout'
 import {
   atualizarPermissoes,
@@ -12,6 +13,10 @@ import {
 import { listarRelatorios, RelatorioInfo } from '../../api/relatorios'
 import { mensagemErro } from '../../api/client'
 import { useAuth } from '../../auth/AuthContext'
+import { Button } from '../../components/ui/button'
+import { Card } from '../../components/ui/card'
+import { Input } from '../../components/ui/input'
+import { Label } from '../../components/ui/label'
 
 export default function UsuarioEditar() {
   const { id } = useParams<{ id: string }>()
@@ -52,7 +57,7 @@ export default function UsuarioEditar() {
   if (carregando) {
     return (
       <AdminLayout titulo="Editar usuário" voltarPara="/admin/usuarios" rotuloVoltar="Usuários">
-        <p className="text-slate-500">Carregando...</p>
+        <p className="text-muted-foreground">Carregando...</p>
       </AdminLayout>
     )
   }
@@ -60,8 +65,9 @@ export default function UsuarioEditar() {
   if (erro || !usuario) {
     return (
       <AdminLayout titulo="Editar usuário" voltarPara="/admin/usuarios" rotuloVoltar="Usuários">
-        <div className="bg-red-100 dark:bg-red-950/40 text-red-700 dark:text-red-300 text-sm rounded-lg p-3">
-          {erro ?? 'Usuário não encontrado.'}
+        <div className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
+          <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+          <span>{erro ?? 'Usuário não encontrado.'}</span>
         </div>
       </AdminLayout>
     )
@@ -76,11 +82,7 @@ export default function UsuarioEditar() {
       rotuloVoltar="Usuários"
     >
       <div className="space-y-6">
-        <SecaoDados
-          usuario={usuario}
-          souEu={souEu}
-          onSalvo={recarregar}
-        />
+        <SecaoDados usuario={usuario} souEu={souEu} onSalvo={recarregar} />
         {!usuario.is_admin && (
           <SecaoPermissoes
             usuario={usuario}
@@ -90,18 +92,21 @@ export default function UsuarioEditar() {
           />
         )}
         {usuario.is_admin && (
-          <div className="bg-indigo-50 dark:bg-indigo-950/30 border border-indigo-200 dark:border-indigo-800 rounded-xl p-4 text-sm text-indigo-800 dark:text-indigo-200">
-            Administradores veem todos os relatórios automaticamente. As
-            permissões por relatório só se aplicam a usuários comuns.
-          </div>
+          <Card className="p-4">
+            <div className="flex items-start gap-3 text-sm text-foreground">
+              <Info className="h-4 w-4 shrink-0 mt-0.5 text-primary" />
+              <span>
+                Administradores veem todos os relatórios automaticamente. As
+                permissões por relatório só se aplicam a usuários comuns.
+              </span>
+            </div>
+          </Card>
         )}
         <SecaoResetarSenha usuarioId={usuario.id} />
       </div>
     </AdminLayout>
   )
 }
-
-// ----------- Seção: Dados -----------
 
 function SecaoDados({
   usuario,
@@ -138,35 +143,25 @@ function SecaoDados({
   }
 
   return (
-    <section className="bg-white dark:bg-slate-900 rounded-xl shadow p-6">
+    <Card className="p-6">
       <h2 className="text-base font-semibold mb-4">Dados</h2>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <label className="block text-sm font-medium mb-1">Username</label>
-          <input
-            type="text"
-            value={usuario.username}
-            disabled
-            className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2 font-mono text-slate-500"
-          />
-          <p className="text-xs text-slate-500 mt-1">Username não pode ser alterado.</p>
+        <div className="space-y-2">
+          <Label htmlFor="e-username">Username</Label>
+          <Input id="e-username" value={usuario.username} disabled className="font-mono" />
+          <p className="text-xs text-muted-foreground">Username não pode ser alterado.</p>
         </div>
-        <div>
-          <label className="block text-sm font-medium mb-1">Nome completo</label>
-          <input
-            type="text"
-            value={nome}
-            onChange={(e) => setNome(e.target.value)}
-            className="w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2"
-          />
+        <div className="space-y-2">
+          <Label htmlFor="e-nome">Nome completo</Label>
+          <Input id="e-nome" value={nome} onChange={(e) => setNome(e.target.value)} />
         </div>
-        <div className="md:col-span-2">
-          <label className="block text-sm font-medium mb-1">Email</label>
-          <input
+        <div className="md:col-span-2 space-y-2">
+          <Label htmlFor="e-email">Email</Label>
+          <Input
+            id="e-email"
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2"
           />
         </div>
       </div>
@@ -182,7 +177,9 @@ function SecaoDados({
           />
           Administrador
           {souEu && (
-            <span className="text-xs text-slate-500">(não é possível alterar o próprio)</span>
+            <span className="text-xs text-muted-foreground">
+              (não é possível alterar o próprio)
+            </span>
           )}
         </label>
         <label className="flex items-center gap-2 text-sm">
@@ -195,31 +192,28 @@ function SecaoDados({
           />
           Ativo
           {souEu && (
-            <span className="text-xs text-slate-500">(não é possível desativar a si mesmo)</span>
+            <span className="text-xs text-muted-foreground">
+              (não é possível desativar a si mesmo)
+            </span>
           )}
         </label>
       </div>
 
       {erro && (
-        <div className="mt-4 bg-red-100 dark:bg-red-950/40 text-red-700 dark:text-red-300 text-sm rounded-lg p-3">
-          {erro}
+        <div className="mt-4 flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
+          <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+          <span>{erro}</span>
         </div>
       )}
 
       <div className="mt-6">
-        <button
-          onClick={salvar}
-          disabled={salvando}
-          className="px-4 py-2 rounded-lg bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 text-sm font-medium disabled:opacity-50"
-        >
+        <Button onClick={salvar} disabled={salvando}>
           {salvando ? 'Salvando...' : 'Salvar dados'}
-        </button>
+        </Button>
       </div>
-    </section>
+    </Card>
   )
 }
-
-// ----------- Seção: Permissões -----------
 
 function SecaoPermissoes({
   usuario,
@@ -265,27 +259,21 @@ function SecaoPermissoes({
   }
 
   return (
-    <section className="bg-white dark:bg-slate-900 rounded-xl shadow p-6">
+    <Card className="p-6">
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-base font-semibold">Permissões por relatório</h2>
-        <div className="flex gap-2 text-xs">
-          <button
-            onClick={marcarTodos}
-            className="px-2 py-1 rounded border border-slate-300 dark:border-slate-700"
-          >
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={marcarTodos}>
             Marcar todos
-          </button>
-          <button
-            onClick={limpar}
-            className="px-2 py-1 rounded border border-slate-300 dark:border-slate-700"
-          >
+          </Button>
+          <Button variant="outline" size="sm" onClick={limpar}>
             Limpar
-          </button>
+          </Button>
         </div>
       </div>
 
       {relatoriosDisponiveis.length === 0 ? (
-        <p className="text-sm text-slate-500">
+        <p className="text-sm text-muted-foreground">
           Nenhum relatório cadastrado no sistema.
         </p>
       ) : (
@@ -293,7 +281,7 @@ function SecaoPermissoes({
           {relatoriosDisponiveis.map((r) => (
             <label
               key={r.id}
-              className="flex items-start gap-3 p-3 rounded-lg border border-slate-200 dark:border-slate-700"
+              className="flex items-start gap-3 p-3 rounded-lg border border-border hover:bg-accent/40 transition-colors cursor-pointer"
             >
               <input
                 type="checkbox"
@@ -301,10 +289,10 @@ function SecaoPermissoes({
                 onChange={() => toggle(r.id)}
                 className="mt-1 rounded"
               />
-              <div>
+              <div className="min-w-0">
                 <div className="text-sm font-medium">{r.nome}</div>
-                <div className="text-xs text-slate-500 font-mono">{r.id}</div>
-                <div className="text-xs text-slate-500 mt-1">{r.descricao}</div>
+                <div className="text-xs text-muted-foreground font-mono">{r.id}</div>
+                <div className="text-xs text-muted-foreground mt-1">{r.descricao}</div>
               </div>
             </label>
           ))}
@@ -312,30 +300,26 @@ function SecaoPermissoes({
       )}
 
       {erro && (
-        <div className="mt-4 bg-red-100 dark:bg-red-950/40 text-red-700 dark:text-red-300 text-sm rounded-lg p-3">
-          {erro}
+        <div className="mt-4 flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
+          <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+          <span>{erro}</span>
         </div>
       )}
       {msg && (
-        <div className="mt-4 bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 text-sm rounded-lg p-3">
-          {msg}
+        <div className="mt-4 flex items-start gap-2 rounded-md border border-success/30 bg-success/10 p-3 text-sm text-success">
+          <CheckCircle2 className="h-4 w-4 shrink-0 mt-0.5" />
+          <span>{msg}</span>
         </div>
       )}
 
       <div className="mt-6">
-        <button
-          onClick={salvar}
-          disabled={salvando}
-          className="px-4 py-2 rounded-lg bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 text-sm font-medium disabled:opacity-50"
-        >
+        <Button onClick={salvar} disabled={salvando}>
           {salvando ? 'Salvando...' : 'Salvar permissões'}
-        </button>
+        </Button>
       </div>
-    </section>
+    </Card>
   )
 }
-
-// ----------- Seção: Resetar Senha -----------
 
 function SecaoResetarSenha({ usuarioId }: { usuarioId: number }) {
   const [novaSenha, setNovaSenha] = useState('')
@@ -369,53 +353,54 @@ function SecaoResetarSenha({ usuarioId }: { usuarioId: number }) {
   }
 
   return (
-    <section className="bg-white dark:bg-slate-900 rounded-xl shadow p-6">
+    <Card className="p-6">
       <h2 className="text-base font-semibold mb-1">Redefinir senha</h2>
-      <p className="text-xs text-slate-500 mb-4">
+      <p className="text-xs text-muted-foreground mb-4">
         Encerra todas as sessões ativas deste usuário.
       </p>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <label className="block text-sm font-medium mb-1">Nova senha</label>
-          <input
+        <div className="space-y-2">
+          <Label htmlFor="r-nova">Nova senha</Label>
+          <Input
+            id="r-nova"
             type="password"
             value={novaSenha}
             onChange={(e) => setNovaSenha(e.target.value)}
-            className="w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2"
           />
-          <p className="text-xs text-slate-500 mt-1">Mín. 8 chars + 1 especial.</p>
+          <p className="text-xs text-muted-foreground">Mín. 8 chars + 1 especial.</p>
         </div>
-        <div>
-          <label className="block text-sm font-medium mb-1">Confirmar</label>
-          <input
+        <div className="space-y-2">
+          <Label htmlFor="r-conf">Confirmar</Label>
+          <Input
+            id="r-conf"
             type="password"
             value={confirmacao}
             onChange={(e) => setConfirmacao(e.target.value)}
-            className="w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2"
           />
         </div>
       </div>
 
       {erro && (
-        <div className="mt-4 bg-red-100 dark:bg-red-950/40 text-red-700 dark:text-red-300 text-sm rounded-lg p-3">
-          {erro}
+        <div className="mt-4 flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
+          <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+          <span>{erro}</span>
         </div>
       )}
       {msg && (
-        <div className="mt-4 bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 text-sm rounded-lg p-3">
-          {msg}
+        <div className="mt-4 flex items-start gap-2 rounded-md border border-success/30 bg-success/10 p-3 text-sm text-success">
+          <CheckCircle2 className="h-4 w-4 shrink-0 mt-0.5" />
+          <span>{msg}</span>
         </div>
       )}
 
       <div className="mt-6">
-        <button
+        <Button
           onClick={resetar}
           disabled={enviando || !novaSenha || !confirmacao}
-          className="px-4 py-2 rounded-lg bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 text-sm font-medium disabled:opacity-50"
         >
           {enviando ? 'Redefinindo...' : 'Redefinir senha'}
-        </button>
+        </Button>
       </div>
-    </section>
+    </Card>
   )
 }

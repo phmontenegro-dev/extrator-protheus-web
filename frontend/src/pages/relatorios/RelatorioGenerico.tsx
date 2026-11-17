@@ -156,14 +156,14 @@ function FormularioExtracao({ relatorio }: { relatorio: RelatorioInfo }) {
       {erro && (
         <div
           role="alert"
-          className="mt-4 bg-red-100 dark:bg-red-950/40 text-red-700 dark:text-red-300 text-sm rounded-lg p-3"
+          className="mt-4 border border-destructive/30 bg-destructive/10 text-destructive text-sm rounded-lg p-3"
         >
           {erro}
         </div>
       )}
 
       {extraindo && (
-        <p className="text-xs text-slate-500 mt-3">
+        <p className="text-xs text-muted-foreground mt-3">
           Não feche esta aba. Relatórios grandes podem levar alguns minutos.
         </p>
       )}
@@ -191,7 +191,7 @@ function FormNenhum({
 }) {
   return (
     <div>
-      <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
+      <p className="text-sm text-muted-foreground mb-4">
         Este relatório não requer filtros. Clique abaixo para gerar o CSV.
       </p>
       <BotaoExtrair extraindo={extraindo} onClick={onExtrair} />
@@ -279,7 +279,7 @@ function FormFilialPeriodo({
           value={filial}
           onChange={(e) => setFilial(e.target.value)}
           disabled={extraindo}
-          className="w-full md:w-60 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 outline-none focus:ring-2 focus:ring-slate-400 disabled:opacity-50 font-mono"
+          className="w-full md:w-60 rounded-lg border border-border bg-surface px-3 py-2 outline-none focus:ring-2 focus:ring-ring disabled:opacity-50 font-mono"
         />
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -317,7 +317,7 @@ function CampoData({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         disabled={disabled}
-        className="w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 outline-none focus:ring-2 focus:ring-slate-400 disabled:opacity-50"
+        className="w-full rounded-lg border border-border bg-surface px-3 py-2 outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
       />
     </div>
   )
@@ -337,7 +337,7 @@ function BotaoExtrair({
       type={type}
       onClick={onClick}
       disabled={extraindo}
-      className="w-full md:w-auto px-6 bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 rounded-lg py-2 font-medium disabled:opacity-50"
+      className="w-full md:w-auto px-6 bg-primary text-primary-foreground rounded-lg py-2 font-medium disabled:opacity-50"
     >
       {extraindo ? 'Extraindo (pode levar alguns minutos)...' : 'Extrair CSV'}
     </button>

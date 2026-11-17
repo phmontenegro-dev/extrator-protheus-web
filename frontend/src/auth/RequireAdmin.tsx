@@ -15,7 +15,7 @@ export function RequireAdmin({ children }: { children: ReactNode }) {
   if (carregando) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="text-slate-500">Carregando...</div>
+        <div className="text-muted-foreground">Carregando...</div>
       </div>
     )
   }
