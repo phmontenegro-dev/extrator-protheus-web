@@ -4,6 +4,7 @@ import {
   ChevronRight,
   FileSpreadsheet,
   FolderTree,
+  Inbox,
   LayoutDashboard,
   LogOut,
   Menu as MenuIcon,
@@ -193,6 +194,19 @@ export function Sidebar() {
               />
             </Secao>
           )}
+
+          {/* MEUS JOBS — todo usuário autenticado vê (quem não tem permissão
+              nenhuma simplesmente nunca vai ter linha pra ver). */}
+          <Secao
+            titulo="Execuções"
+            icone={<Inbox className="h-3.5 w-3.5" />}
+          >
+            <ItemNav
+              to="/jobs"
+              label="Meus jobs"
+              icon={<Inbox className="h-4 w-4" />}
+            />
+          </Secao>
 
           {/* ADMIN — só pra admin */}
           {usuario?.is_admin && (

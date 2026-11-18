@@ -10,7 +10,8 @@ import {
 } from 'lucide-react'
 import { Button } from '../components/ui/button'
 import { Card } from '../components/ui/card'
-import { downloadCsvSql, executarSql, SqlExecutarResponse } from '../api/sqlLivre'
+import { executarSql, SqlExecutarResponse } from '../api/sqlLivre'
+import { criarJobSql } from '../api/jobs'
 import { mensagemErro } from '../api/client'
 import { useToast } from '../lib/toast'
 import { cn } from '../lib/utils'
@@ -74,21 +75,17 @@ export default function CodigoSql() {
     setErro(null)
     setBaixando(true)
     try {
-      await downloadCsvSql(sql)
+      const r = await criarJobSql(sql)
       toast({
-        title: 'Download concluído',
-        description: 'O navegador salvou o CSV.',
+        title: 'Job criado',
+        description: 'Acompanhe o progresso em "Meus jobs".',
         variant: 'success',
       })
+      navigate(`/jobs?focus=${encodeURIComponent(r.job_id)}`)
     } catch (e) {
-      const msg = mensagemErro(e, 'Falha ao baixar.')
+      const msg = mensagemErro(e, 'Falha ao enviar o job.')
       setErro(msg)
-      toast({
-        title: 'Falha no download',
-        description: msg,
-        variant: 'destructive',
-      })
-    } finally {
+      toast({ title: 'Não foi possível enviar', description: msg, variant: 'destructive' })
       setBaixando(false)
     }
   }
@@ -172,7 +169,7 @@ WHERE rownum <= 100
           disabled={executando || baixando}
         >
           <Download className="h-4 w-4" />
-          {baixando ? 'Baixando...' : 'Baixar CSV completo'}
+          {baixando ? 'Enviando...' : 'Baixar CSV completo (background)'}
         </Button>
       </div>
 

@@ -1,11 +1,13 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
-  extrairLivre,
   listarColunas,
   listarTabelas,
   TabelaInfo,
 } from '../../api/relatorioLivre'
+import { criarJobLivre } from '../../api/jobs'
 import { mensagemErro } from '../../api/client'
+import { useToast } from '../../lib/toast'
 import { TabelaCombobox } from '../../components/TabelaCombobox'
 
 /**
@@ -20,6 +22,8 @@ import { TabelaCombobox } from '../../components/TabelaCombobox'
  *   6. Extrair → download direto do CSV
  */
 export default function FormLivre() {
+  const navigate = useNavigate()
+  const { toast } = useToast()
   const [tabelas, setTabelas] = useState<TabelaInfo[]>([])
   const [tabelasCarregando, setTabelasCarregando] = useState(true)
   const [erroGeral, setErroGeral] = useState<string | null>(null)
@@ -161,7 +165,7 @@ export default function FormLivre() {
 
     setExtraindo(true)
     try {
-      await extrairLivre({
+      const r = await criarJobLivre({
         tabela: tabelaSelecionada.nome,
         colunas: Array.from(colunasSelecionadas),
         campo_data: temCampoData ? campoData : null,
@@ -169,9 +173,16 @@ export default function FormLivre() {
         data_fim: temCampoData ? dataFim : null,
         max_linhas: maxNum,
       })
+      toast({
+        title: 'Job criado',
+        description: 'Acompanhe o progresso em "Meus jobs".',
+        variant: 'success',
+      })
+      navigate(`/jobs?focus=${encodeURIComponent(r.job_id)}`)
     } catch (e) {
-      setErroExtracao(mensagemErro(e, 'Falha ao extrair.'))
-    } finally {
+      const msg = mensagemErro(e, 'Falha ao enviar o job.')
+      setErroExtracao(msg)
+      toast({ title: 'Não foi possível enviar', description: msg, variant: 'destructive' })
       setExtraindo(false)
     }
   }
@@ -360,13 +371,14 @@ export default function FormLivre() {
             disabled={extraindo || colunasSelecionadas.size === 0}
             className="w-full md:w-auto px-6 bg-primary text-primary-foreground rounded-lg py-2 font-medium disabled:opacity-50"
           >
-            {extraindo ? 'Extraindo (pode levar alguns minutos)...' : 'Extrair CSV'}
+            {extraindo ? 'Enviando...' : 'Extrair em background'}
           </button>
-          {extraindo && (
-            <p className="text-xs text-muted-foreground mt-2">
-              Não feche esta aba.
-            </p>
-          )}
+          <p className="text-xs text-muted-foreground mt-2">
+            A extração roda em background — você pode fechar a aba que o CSV estará esperando em{' '}
+            <button type="button" className="underline" onClick={() => navigate('/jobs')}>
+              Meus jobs
+            </button>.
+          </p>
         </div>
       )}
     </form>

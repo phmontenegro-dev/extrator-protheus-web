@@ -5,6 +5,7 @@ import {
   Beaker,
   Boxes,
   FileSpreadsheet,
+  Inbox,
   Package,
   Receipt,
   ScrollText,
@@ -102,11 +103,20 @@ export default function Menu() {
 
   return (
     <div className="mx-auto max-w-5xl px-6 py-8 md:py-10">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold tracking-tight">Relatórios disponíveis</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Selecione um relatório para configurar os filtros e extrair.
-        </p>
+      <div className="mb-6 flex items-start justify-between flex-wrap gap-3">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Relatórios disponíveis</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Selecione um relatório para configurar os filtros e extrair.
+          </p>
+        </div>
+        <button
+          onClick={() => navigate('/jobs')}
+          className="flex items-center gap-2 px-3 py-2 rounded-lg border border-border hover:bg-accent text-sm font-medium transition-colors"
+        >
+          <Inbox className="h-4 w-4" />
+          Meus jobs
+        </button>
       </div>
 
       {carregando && (

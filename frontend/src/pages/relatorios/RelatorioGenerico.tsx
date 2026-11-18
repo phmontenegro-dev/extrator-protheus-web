@@ -2,11 +2,11 @@ import { FormEvent, useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { ChevronLeft } from 'lucide-react'
 import {
-  extrairRelatorio,
   FiltrosPayload,
   listarRelatorios,
   RelatorioInfo,
 } from '../../api/relatorios'
+import { criarJobRelatorio } from '../../api/jobs'
 import { mensagemErro } from '../../api/client'
 import { Skeleton } from '../../components/ui/skeleton'
 import { useToast } from '../../lib/toast'
@@ -114,35 +114,37 @@ export default function RelatorioGenerico() {
 
 function FormularioExtracao({ relatorio }: { relatorio: RelatorioInfo }) {
   const { toast } = useToast()
+  const navigate = useNavigate()
   const [erro, setErro] = useState<string | null>(null)
-  const [extraindo, setExtraindo] = useState(false)
+  const [enviando, setEnviando] = useState(false)
 
   const executar = async (payload: FiltrosPayload) => {
     setErro(null)
-    setExtraindo(true)
+    setEnviando(true)
     try {
-      await extrairRelatorio(relatorio.id, payload)
+      const r = await criarJobRelatorio(relatorio.id, payload)
       toast({
-        title: 'Extração concluída',
-        description: 'O download do CSV foi disparado pelo navegador.',
+        title: 'Job criado',
+        description: 'Acompanhe o progresso em "Meus jobs".',
         variant: 'success',
       })
+      // Redireciona pra /jobs destacando o job recém-criado.
+      navigate(`/jobs?focus=${encodeURIComponent(r.job_id)}`)
     } catch (e) {
-      const msg = mensagemErro(e, 'Falha ao extrair o relatório.')
+      const msg = mensagemErro(e, 'Falha ao enviar o job.')
       setErro(msg)
       toast({
-        title: 'Falha na extração',
+        title: 'Não foi possível enviar',
         description: msg,
         variant: 'destructive',
       })
-    } finally {
-      setExtraindo(false)
+      setEnviando(false)
     }
   }
 
   // "livre" tem UI própria: combo de tabela + colunas dinâmicas + validações
   // específicas. Delegamos tudo pra FormLivre.tsx, que também cuida do
-  // próprio estado de "extraindo" / erro, então pulamos os blocos genéricos.
+  // próprio estado de envio / erro.
   if (relatorio.filtros === 'livre') {
     return <FormLivre />
   }
@@ -150,18 +152,18 @@ function FormularioExtracao({ relatorio }: { relatorio: RelatorioInfo }) {
   return (
     <>
       {relatorio.filtros === 'nenhum' && (
-        <FormNenhum extraindo={extraindo} onExtrair={() => executar({})} />
+        <FormNenhum extraindo={enviando} onExtrair={() => executar({})} />
       )}
       {relatorio.filtros === 'periodo' && (
         <FormPeriodo
-          extraindo={extraindo}
+          extraindo={enviando}
           onExtrair={(f) => executar(f)}
           onErroValidacao={setErro}
         />
       )}
       {relatorio.filtros === 'filial_periodo' && (
         <FormFilialPeriodo
-          extraindo={extraindo}
+          extraindo={enviando}
           onExtrair={(f) => executar(f)}
           onErroValidacao={setErro}
         />
@@ -176,11 +178,12 @@ function FormularioExtracao({ relatorio }: { relatorio: RelatorioInfo }) {
         </div>
       )}
 
-      {extraindo && (
-        <p className="text-xs text-muted-foreground mt-3">
-          Não feche esta aba. Relatórios grandes podem levar alguns minutos.
-        </p>
-      )}
+      <p className="text-xs text-muted-foreground mt-3">
+        A extração roda em background — pode fechar a aba que o CSV estará esperando em
+        <button type="button" className="underline ml-1" onClick={() => navigate('/jobs')}>
+          Meus jobs
+        </button>.
+      </p>
     </>
   )
 }
@@ -353,7 +356,7 @@ function BotaoExtrair({
       disabled={extraindo}
       className="w-full md:w-auto px-6 bg-primary text-primary-foreground rounded-lg py-2 font-medium disabled:opacity-50"
     >
-      {extraindo ? 'Extraindo (pode levar alguns minutos)...' : 'Extrair CSV'}
+      {extraindo ? 'Enviando...' : 'Extrair em background'}
     </button>
   )
 }
