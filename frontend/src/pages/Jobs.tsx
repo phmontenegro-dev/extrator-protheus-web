@@ -21,7 +21,6 @@ import {
   JobResumo,
   JobStatus,
   listarJobs,
-  obterJob,
   STATUS_ATIVOS,
 } from '../api/jobs'
 import { mensagemErro } from '../api/client'
