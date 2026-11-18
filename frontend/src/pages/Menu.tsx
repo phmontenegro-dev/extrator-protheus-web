@@ -9,6 +9,7 @@ import {
   Receipt,
   ScrollText,
   Sparkles,
+  TerminalSquare,
   Timer,
   Truck,
 } from 'lucide-react'
@@ -32,6 +33,16 @@ const ICONES: Record<string, typeof FileSpreadsheet> = {
   consolidado_suzano_jhon: BarChart3,
   paradas_maquina: Timer,
   relatorio_livre: Sparkles,
+  codigo_sql: TerminalSquare,
+}
+
+/**
+ * Pra onde navegar quando o usuário clica num card. A maioria vai pra
+ * /relatorios/<id>, mas tipos especiais (livre e sql) têm rotas próprias.
+ */
+function rotaDoRelatorio(r: RelatorioInfo): string {
+  if (r.filtros === 'sql') return '/sql'
+  return `/relatorios/${r.id}`
 }
 
 type Grupo = {
@@ -141,11 +152,11 @@ export default function Menu() {
           <div className="grid gap-4 md:grid-cols-2">
             {g.relatorios.map((r) => {
               const Icone = ICONES[r.id] ?? FileSpreadsheet
-              const destaque = r.filtros === 'livre'
+              const destaque = r.filtros === 'livre' || r.filtros === 'sql'
               return (
                 <button
                   key={r.id}
-                  onClick={() => navigate(`/relatorios/${r.id}`)}
+                  onClick={() => navigate(rotaDoRelatorio(r))}
                   className="text-left"
                 >
                   <Card

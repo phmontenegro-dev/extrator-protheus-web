@@ -1,7 +1,7 @@
 import { api } from './client'
 
 /** Tipos de filtros possíveis — espelha o registry do backend. */
-export type TipoFiltro = 'nenhum' | 'periodo' | 'filial_periodo' | 'livre'
+export type TipoFiltro = 'nenhum' | 'periodo' | 'filial_periodo' | 'livre' | 'sql'
 
 export type RelatorioInfo = {
   id: string

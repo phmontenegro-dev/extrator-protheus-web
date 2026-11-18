@@ -57,13 +57,16 @@ export function Sidebar() {
   }, [location.pathname])
 
   /**
-   * Separa o relatório livre dos "prontos" (que agrupamos por área).
-   * Dentro dos prontos: agrupa por area_id, ordena por area_ordem, "Outros"
-   * (sem área) no fim.
+   * Separa os tipos especiais (livre e sql) dos "prontos" (que agrupamos
+   * por área). Dentro dos prontos: agrupa por area_id, ordena por area_ordem,
+   * "Outros" (sem área) no fim.
    */
-  const { prontosGrupos, livres } = useMemo(() => {
+  const { prontosGrupos, livres, sqls } = useMemo(() => {
     const livres = relatorios.filter((r) => r.filtros === 'livre')
-    const prontos = relatorios.filter((r) => r.filtros !== 'livre')
+    const sqls = relatorios.filter((r) => r.filtros === 'sql')
+    const prontos = relatorios.filter(
+      (r) => r.filtros !== 'livre' && r.filtros !== 'sql',
+    )
 
     const mapa = new Map<
       string,
@@ -94,7 +97,7 @@ export function Sidebar() {
     for (const g of prontosGrupos) {
       g.itens.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
     }
-    return { prontosGrupos, livres }
+    return { prontosGrupos, livres, sqls }
   }, [relatorios])
 
   return (
@@ -178,16 +181,18 @@ export function Sidebar() {
             ))}
           </Secao>
 
-          {/* CÓDIGO SQL — placeholder (Etapa 9) */}
-          <Secao titulo="Avançado" icone={<TerminalSquare className="h-3.5 w-3.5" />}>
-            <div className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground cursor-not-allowed">
-              <TerminalSquare className="h-4 w-4" />
-              <span className="flex-1">Código SQL</span>
-              <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] uppercase tracking-wider">
-                em breve
-              </span>
-            </div>
-          </Secao>
+          {/* CÓDIGO SQL — só aparece pra quem tem permissão.
+              Admin recebe automaticamente; usuário comum só com permissão
+              "codigo_sql" no /admin/usuarios/:id. */}
+          {sqls.length > 0 && (
+            <Secao titulo="Avançado" icone={<TerminalSquare className="h-3.5 w-3.5" />}>
+              <ItemNav
+                to="/sql"
+                label="Código SQL"
+                icon={<TerminalSquare className="h-4 w-4" />}
+              />
+            </Secao>
+          )}
 
           {/* ADMIN — só pra admin */}
           {usuario?.is_admin && (

@@ -6,6 +6,7 @@ import { AppLayout } from './components/AppLayout'
 import Login from './pages/Login'
 import Menu from './pages/Menu'
 import NotFound from './pages/NotFound'
+import CodigoSql from './pages/CodigoSql'
 import RelatorioGenerico from './pages/relatorios/RelatorioGenerico'
 import Admin from './pages/admin/Admin'
 import Usuarios from './pages/admin/Usuarios'
@@ -51,6 +52,7 @@ export default function App() {
             path="/relatorios/:id"
             element={<Protegida><RelatorioGenerico /></Protegida>}
           />
+          <Route path="/sql" element={<Protegida><CodigoSql /></Protegida>} />
           <Route path="/admin" element={<Admin_><Admin /></Admin_>} />
           <Route path="/admin/usuarios" element={<Admin_><Usuarios /></Admin_>} />
           <Route path="/admin/usuarios/:id" element={<Admin_><UsuarioEditar /></Admin_>} />
