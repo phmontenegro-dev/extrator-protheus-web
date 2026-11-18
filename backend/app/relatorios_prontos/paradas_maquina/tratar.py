@@ -17,7 +17,8 @@ import pandas as pd
 RENOMEAR = {
     "FILIAL":               "FILIAL",
     "DATA_PARADA":          "DATA DA PARADA",
-    "MAQUINA":              "MÁQUINA",
+    "COD_MAQUINA":          "CÓDIGO DA MÁQUINA",
+    "DESCRICAO_MAQUINA":    "DESCRIÇÃO DA MÁQUINA",
     "OP":                   "ORDEM DE PRODUÇÃO",
     "COD_PRODUTO":          "CÓDIGO DO PRODUTO",
     "OPERADOR":             "OPERADOR",
@@ -45,7 +46,8 @@ COLS_TEMPO = ["TEMPO DE PARADA (MIN)"]
 
 ORDEM_FINAL = [
     "FILIAL",
-    "MÁQUINA",
+    "CÓDIGO DA MÁQUINA",
+    "DESCRIÇÃO DA MÁQUINA",
     "DATA DA PARADA",
     "HORA INICIAL DA PARADA",
     "HORA FINAL DA PARADA",

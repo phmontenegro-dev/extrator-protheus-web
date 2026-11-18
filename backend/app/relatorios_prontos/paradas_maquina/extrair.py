@@ -14,7 +14,9 @@ Notas sobre o SQL:
   - Usa REGEXP + TO_DATE 'FXYYYYMMDDHH24MI' pra montar timestamp a partir das
     colunas separadas de data (AAAAMMDD) e hora (HH:MM) do Protheus,
     descartando valores malformados.
-  - Faz LEFT JOIN em CYN pra trazer a descrição amigável do motivo da parada.
+  - LEFT JOIN em CYN010 traz a descrição amigável do motivo da parada.
+  - LEFT JOIN em SH1010 traz a descrição da máquina (H1_DESCRI) a partir do
+    código do recurso.
   - O INNER JOIN entre PARADAS e PRODUÇÃO exige:
       - mesma filial e mesma máquina
       - sobreposição temporal (fim da produção >= início da parada,
@@ -80,7 +82,8 @@ def extrair_paradas_maquina(data_inicio: str, data_fim: str) -> pd.DataFrame:
         SELECT
             P.H6_FILIAL AS FILIAL,
             P.H6_DATAINI AS DATA_PARADA,
-            P.H6_RECURSO AS MAQUINA,
+            P.H6_RECURSO AS COD_MAQUINA,
+            M.H1_DESCRI AS DESCRICAO_MAQUINA,
             PR.H6_OP AS OP,
             PR.H6_PRODUTO AS COD_PRODUTO,
             PR.H6_OPERADO AS OPERADOR,
@@ -109,6 +112,9 @@ def extrair_paradas_maquina(data_inicio: str, data_fim: str) -> pd.DataFrame:
             LEFT JOIN CYN010 C
                 ON TRIM(C.CYN_CDSP) = TRIM(P.H6_MOTIVO)
                 AND C.D_E_L_E_T_ = ' '
+            LEFT JOIN SH1010 M
+                ON TRIM(M.H1_CODIGO) = TRIM(P.H6_RECURSO)
+                AND M.D_E_L_E_T_ = ' '
         WHERE P.H6_DATAFIN BETWEEN :data_inicio AND :data_fim
         ORDER BY
             P.H6_RECURSO,
@@ -125,7 +131,7 @@ def extrair_paradas_maquina(data_inicio: str, data_fim: str) -> pd.DataFrame:
         conn.close()
 
     # Códigos como texto (preserva zeros à esquerda).
-    for col in ["FILIAL", "MAQUINA", "OP", "COD_PRODUTO",
+    for col in ["FILIAL", "COD_MAQUINA", "OP", "COD_PRODUTO",
                 "OPERADOR", "COD_MOTIVO", "PRODUTO_PARADA"]:
         if col in df.columns:
             df[col] = df[col].astype(str).str.strip()

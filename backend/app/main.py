@@ -6,19 +6,42 @@ Execute em desenvolvimento:
 
 Em produção, usar systemd + uvicorn (ver docs/SETUP_UBUNTU.md).
 """
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
-from app.routers import admin, admin_areas, auth, health, relatorio_livre, relatorios, sql_livre
+from app.jobs.executor import desligar_executor, iniciar_executor
+from app.routers import (
+    admin,
+    admin_areas,
+    auth,
+    health,
+    jobs,
+    relatorio_livre,
+    relatorios,
+    sql_livre,
+)
 
 
 settings = get_settings()
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    iniciar_executor()
+    yield
+    # Shutdown
+    desligar_executor()
+
 
 app = FastAPI(
     title="Extrator Protheus — API",
     description="API do Extrator Protheus. Autenticação via cookie httpOnly.",
     version="0.1.0",
+    lifespan=lifespan,
 )
 
 # CORS em desenvolvimento: libera o Vite (porta 5173).
@@ -38,6 +61,7 @@ app.include_router(auth.router)
 app.include_router(relatorios.router)
 app.include_router(relatorio_livre.router)
 app.include_router(sql_livre.router)
+app.include_router(jobs.router)
 app.include_router(admin.router)
 app.include_router(admin_areas.router)
 

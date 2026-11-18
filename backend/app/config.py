@@ -50,6 +50,17 @@ class Settings(BaseSettings):
     # demorar — ajuste no .env se necessário.
     oracle_query_timeout_s: int = 600
 
+    # ----- Jobs assíncronos (Etapa 11) -----
+    # Onde ficam os CSVs dos jobs concluídos. A pasta precisa ser gravável
+    # pelo usuário que roda o uvicorn (extrator, em produção).
+    pasta_jobs: str = "/var/lib/extrator/jobs"
+    # Workers rodando em paralelo. 2 é o padrão — protege Oracle e disco.
+    jobs_max_workers: int = 2
+    # Quantos jobs um usuário pode ter rodando OU na fila ao mesmo tempo.
+    jobs_max_por_usuario: int = 1
+    # Dias de retenção; passado isso o cronjob apaga o CSV e a linha do banco.
+    jobs_retencao_dias: int = 1
+
     @property
     def cors_origins_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]

@@ -6,28 +6,26 @@ import {
   TabelaInfo,
 } from '../../api/relatorioLivre'
 import { mensagemErro } from '../../api/client'
+import { TabelaCombobox } from '../../components/TabelaCombobox'
 
 /**
  * Formulário do Relatório Livre.
  *
  * Fluxo:
  *   1. Carrega a lista de tabelas Protheus (pode demorar — consulta ALL_TABLES)
- *   2. Usuário escolhe uma tabela via combo com autocomplete (datalist nativo)
+ *   2. Usuário escolhe uma tabela via TabelaCombobox (filtra por substring)
  *   3. Ao escolher, buscamos as colunas (ALL_TAB_COLUMNS, sem binários)
  *   4. Usuário marca as colunas + escolhe campo_data (opcional)
  *   5. Preenche datas (se campo_data informado) e max_linhas (opcional)
  *   6. Extrair → download direto do CSV
- *
- * Datalist HTML nativo escolhido em vez de um combo custom: zero JS, suporta
- * digitação+filtro automaticamente e aproveita o UI do navegador.
  */
 export default function FormLivre() {
   const [tabelas, setTabelas] = useState<TabelaInfo[]>([])
   const [tabelasCarregando, setTabelasCarregando] = useState(true)
   const [erroGeral, setErroGeral] = useState<string | null>(null)
 
-  // Seleção do usuário.
-  const [tabelaInput, setTabelaInput] = useState('')
+  // Seleção do usuário. tabelaNome é o nome da tabela selecionada ("" = nenhuma).
+  const [tabelaNome, setTabelaNome] = useState('')
   const [colunasDisponiveis, setColunasDisponiveis] = useState<string[]>([])
   const [colunasSelecionadas, setColunasSelecionadas] = useState<Set<string>>(new Set())
   const [carregandoColunas, setCarregandoColunas] = useState(false)
@@ -66,7 +64,7 @@ export default function FormLivre() {
     return m
   }, [tabelas])
 
-  const tabelaSelecionada = mapaTabelas.get(tabelaInput.toUpperCase().trim())
+  const tabelaSelecionada = tabelaNome ? mapaTabelas.get(tabelaNome) ?? null : null
 
   // Ao trocar de tabela (válida), busca as colunas e aplica a sugestão de
   // campo_data se a tabela estiver no TABELAS_CONHECIDAS.
@@ -192,9 +190,6 @@ export default function FormLivre() {
     )
   }
 
-  const nomeDigitadoENaoReconhecido =
-    tabelaInput.trim() !== '' && !tabelaSelecionada
-
   return (
     <form onSubmit={submeter} className="space-y-6">
       {/* 1) Tabela */}
@@ -202,33 +197,14 @@ export default function FormLivre() {
         <label htmlFor="tabela" className="block text-sm font-medium mb-1">
           Tabela
         </label>
-        <input
-          id="tabela"
-          list="lista-tabelas"
-          type="text"
-          value={tabelaInput}
-          onChange={(e) => setTabelaInput(e.target.value.toUpperCase())}
+        <TabelaCombobox
+          tabelas={tabelas}
+          valor={tabelaNome}
+          onEscolher={setTabelaNome}
           disabled={extraindo}
-          placeholder="Digite para filtrar (ex.: SB1010)"
-          className="w-full rounded-lg border border-border bg-surface px-3 py-2 outline-none focus:ring-2 focus:ring-ring disabled:opacity-50 font-mono"
         />
-        <datalist id="lista-tabelas">
-          {tabelas.map((t) => (
-            <option key={t.nome} value={t.nome}>
-              {t.descricao ?? t.nome}
-            </option>
-          ))}
-        </datalist>
-        {tabelaSelecionada?.descricao && (
-          <p className="text-xs text-muted-foreground mt-1">{tabelaSelecionada.descricao}</p>
-        )}
-        {nomeDigitadoENaoReconhecido && (
-          <p className="text-xs text-primary mt-1">
-            Tabela não reconhecida. Escolha uma da lista.
-          </p>
-        )}
         <p className="text-xs text-muted-foreground mt-1">
-          {tabelas.length} tabelas disponíveis.
+          {tabelas.length} tabelas disponíveis — digite para filtrar por nome ou descrição.
         </p>
       </div>
 

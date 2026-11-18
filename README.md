@@ -85,6 +85,7 @@ Veja o guia completo em [docs/SETUP_UBUNTU.md](docs/SETUP_UBUNTU.md).
 - [Setup em Ubuntu (dev)](docs/SETUP_UBUNTU.md)
 - [Deploy em produção](docs/DEPLOY_PRODUCAO.md) · [Passo a passo iniciante](docs/DEPLOY_PASSO_A_PASSO.md)
 - [**Como adicionar um novo relatório pronto**](docs/COMO_ADICIONAR_RELATORIO.md) ← consulta durante o desenvolvimento
+- [Jobs assíncronos — infra e operação](docs/JOBS_ASSINCRONOS.md) · exige pasta `/var/lib/extrator/jobs/` + cron
 
 Resumo:
 
@@ -154,10 +155,17 @@ Veja `backend/.env.example` para a lista completa. As principais:
 - [x] Divisão de relatórios por área (CRUD + menu agrupado)
 - [x] Tela "Código SQL" (SELECT only, com validador defensivo)
 - [ ] Extração assíncrona (job em background + barra de progresso)
+      _· backend pronto (11a): modelo `JobExtracao`, ThreadPool 2w, ETA via mediana
+      histórica, endpoints /jobs/\* e `-async`, script de limpeza._
+      _· pendente: UI (11b) — página /jobs e integração dos formulários._
 - [ ] Filtros dinâmicos no Relatório Livre (operadores por tipo de coluna:
       `=`, `>`, `<`, `LIKE`, `BETWEEN`, `IN`) além do filtro de data
 - [ ] Dashboards com gráficos de relatórios pré-definidos (visões analíticas
       configuráveis, ex: custos, produção, saldo de estoque)
+- [ ] Agendamento de relatórios (cron + envio por e-mail dos resultados)
+- [ ] Editor SQL com syntax highlight e autocompletar (CodeMirror/Monaco)
+- [ ] Queries salvas (favoritos no Código SQL — usuário nomeia e reutiliza)
+- [ ] Perfil do usuário (trocar a própria senha, editar email, preferências)
 
 ## Autor
 

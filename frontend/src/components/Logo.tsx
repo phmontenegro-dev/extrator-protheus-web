@@ -1,8 +1,9 @@
 import { cn } from '@/lib/utils'
 
 /**
- * Logo da Technocoat. Imagem em /public/logo.png — a Vite serve estático
- * de public/ na raiz. Se um dia virar SVG, troca o caminho aqui.
+ * Logo da aplicação. A imagem em /public/logo.png é a silhueta PB — como
+ * fica preta em cima de fundo escuro no dark mode, invertemos com
+ * `dark:invert` (vira branco).
  */
 export function Logo({
   className,
@@ -15,8 +16,8 @@ export function Logo({
     <div className={cn('flex items-center gap-3', className)}>
       <img
         src="/logo.png"
-        alt="Technocoat"
-        className="h-8 w-8 object-contain"
+        alt="Extrator Protheus"
+        className="h-9 w-9 object-contain dark:invert"
       />
       {showText && (
         <div className="flex flex-col leading-tight">
