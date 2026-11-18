@@ -344,7 +344,9 @@ def listar_jobs(
     Ordenação: mais recentes primeiro. Inclui ativos + finalizados dentro
     da retenção.
     """
-    q = db.query(JobExtracao).order_by(desc(JobExtracao.criado_em)).limit(limite)
+    # IMPORTANTE: SQLAlchemy exige que .filter() venha ANTES de .limit() —
+    # chamar filter em query já limitada dispara InvalidRequestError.
+    q = db.query(JobExtracao)
     if todos:
         if not usuario.is_admin:
             raise HTTPException(
@@ -354,7 +356,7 @@ def listar_jobs(
     else:
         q = q.filter(JobExtracao.usuario_id == usuario.id)
 
-    rows = q.all()
+    rows = q.order_by(desc(JobExtracao.criado_em)).limit(limite).all()
     return [JobResumo.model_validate(j) for j in rows]
 
 
