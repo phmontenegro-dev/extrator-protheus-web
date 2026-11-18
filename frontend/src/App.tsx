@@ -10,6 +10,7 @@ import RelatorioGenerico from './pages/relatorios/RelatorioGenerico'
 import Admin from './pages/admin/Admin'
 import Usuarios from './pages/admin/Usuarios'
 import UsuarioEditar from './pages/admin/UsuarioEditar'
+import Areas from './pages/admin/Areas'
 import Logs from './pages/admin/Logs'
 
 /**
@@ -53,6 +54,7 @@ export default function App() {
           <Route path="/admin" element={<Admin_><Admin /></Admin_>} />
           <Route path="/admin/usuarios" element={<Admin_><Usuarios /></Admin_>} />
           <Route path="/admin/usuarios/:id" element={<Admin_><UsuarioEditar /></Admin_>} />
+          <Route path="/admin/areas" element={<Admin_><Areas /></Admin_>} />
           <Route path="/admin/logs" element={<Admin_><Logs /></Admin_>} />
           {/* Qualquer URL desconhecida — página 404 dedicada (em vez de
               redirecionar silenciosamente). O usuário vê o erro e pode

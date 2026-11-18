@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-import { ScrollText, Users } from 'lucide-react'
+import { FolderTree, ScrollText, Users } from 'lucide-react'
 import { AdminLayout } from './AdminLayout'
 import { Card, CardContent } from '../../components/ui/card'
 
@@ -13,6 +13,13 @@ export default function Admin() {
       titulo: 'Usuários',
       descricao: 'Criar, editar, desativar usuários e definir permissões por relatório.',
       rota: '/admin/usuarios',
+    },
+    {
+      id: 'areas',
+      icone: FolderTree,
+      titulo: 'Áreas',
+      descricao: 'Organize os relatórios em categorias (Contábil, Qualidade, etc).',
+      rota: '/admin/areas',
     },
     {
       id: 'logs',

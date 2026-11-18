@@ -8,6 +8,10 @@ export type RelatorioInfo = {
   nome: string
   descricao: string
   filtros: TipoFiltro
+  // Área atribuída. null = relatório vai pra seção "Outros" no menu.
+  area_id: number | null
+  area_nome: string | null
+  area_ordem: number | null
 }
 
 /** Payload enviado pro endpoint de extração. */

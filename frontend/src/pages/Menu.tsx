@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   BarChart3,
@@ -18,10 +18,7 @@ import { Card, CardContent } from '../components/ui/card'
 import { Skeleton } from '../components/ui/skeleton'
 import { cn } from '../lib/utils'
 
-/**
- * Mapa opcional id → ícone. Um relatório sem entrada aqui ganha o ícone
- * padrão FileSpreadsheet.
- */
+/** Mapa opcional id → ícone. Padrão é FileSpreadsheet. */
 const ICONES: Record<string, typeof FileSpreadsheet> = {
   ct2010: ScrollText,
   qpr010: Beaker,
@@ -35,6 +32,13 @@ const ICONES: Record<string, typeof FileSpreadsheet> = {
   consolidado_suzano_jhon: BarChart3,
   paradas_maquina: Timer,
   relatorio_livre: Sparkles,
+}
+
+type Grupo = {
+  chave: string                        // "area:<id>" ou "outros"
+  nome: string                         // "Contábil" | "Outros"
+  ordem: number                        // pra ordenar; "outros" vai ser grande
+  relatorios: RelatorioInfo[]
 }
 
 export default function Menu() {
@@ -51,6 +55,39 @@ export default function Menu() {
       )
       .finally(() => setCarregando(false))
   }, [])
+
+  /**
+   * Agrupa por área. Mantém relatórios ordenados por nome dentro do grupo.
+   * Grupos ordenados por `area_ordem` (menor primeiro). "Outros" vai no fim.
+   */
+  const grupos: Grupo[] = useMemo(() => {
+    const map = new Map<string, Grupo>()
+    for (const r of relatorios) {
+      let chave: string, nome: string, ordem: number
+      if (r.area_id == null) {
+        chave = 'outros'
+        nome = 'Outros'
+        ordem = Number.MAX_SAFE_INTEGER
+      } else {
+        chave = `area:${r.area_id}`
+        nome = r.area_nome ?? '(sem nome)'
+        ordem = r.area_ordem ?? 0
+      }
+      let g = map.get(chave)
+      if (!g) {
+        g = { chave, nome, ordem, relatorios: [] }
+        map.set(chave, g)
+      }
+      g.relatorios.push(r)
+    }
+    const lista = Array.from(map.values())
+    // Ordena grupos; dentro de cada, ordena relatórios por nome
+    lista.sort((a, b) => a.ordem - b.ordem || a.nome.localeCompare(b.nome, 'pt-BR'))
+    for (const g of lista) {
+      g.relatorios.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
+    }
+    return lista
+  }, [relatorios])
 
   return (
     <div className="mx-auto max-w-5xl px-6 py-8 md:py-10">
@@ -93,47 +130,57 @@ export default function Menu() {
         </Card>
       )}
 
-      <div className="grid gap-4 md:grid-cols-2">
-        {relatorios.map((r) => {
-          const Icone = ICONES[r.id] ?? FileSpreadsheet
-          const destaque = r.filtros === 'livre'
-          return (
-            <button
-              key={r.id}
-              onClick={() => navigate(`/relatorios/${r.id}`)}
-              className="text-left"
-            >
-              <Card
-                className={cn(
-                  'h-full transition-all hover:shadow-md hover:border-primary/40',
-                  destaque && 'border-primary/40 bg-primary/5',
-                )}
-              >
-                <CardContent className="p-5">
-                  <div className="flex items-start gap-3">
-                    <div
-                      className={cn(
-                        'flex h-10 w-10 shrink-0 items-center justify-center rounded-lg',
-                        destaque
-                          ? 'bg-primary text-primary-foreground'
-                          : 'bg-accent text-accent-foreground',
-                      )}
-                    >
-                      <Icone className="h-5 w-5" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="font-semibold truncate">{r.nome}</div>
-                      <div className="text-sm text-muted-foreground mt-1 line-clamp-2">
-                        {r.descricao}
+      {!carregando && !erro && grupos.map((g) => (
+        <section key={g.chave} className="mb-8 last:mb-0">
+          <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3 border-b border-border pb-1.5">
+            {g.nome}
+            <span className="ml-2 text-[10px] font-normal lowercase tracking-normal opacity-70">
+              ({g.relatorios.length} {g.relatorios.length === 1 ? 'relatório' : 'relatórios'})
+            </span>
+          </h2>
+          <div className="grid gap-4 md:grid-cols-2">
+            {g.relatorios.map((r) => {
+              const Icone = ICONES[r.id] ?? FileSpreadsheet
+              const destaque = r.filtros === 'livre'
+              return (
+                <button
+                  key={r.id}
+                  onClick={() => navigate(`/relatorios/${r.id}`)}
+                  className="text-left"
+                >
+                  <Card
+                    className={cn(
+                      'h-full transition-all hover:shadow-md hover:border-primary/40',
+                      destaque && 'border-primary/40 bg-primary/5',
+                    )}
+                  >
+                    <CardContent className="p-5">
+                      <div className="flex items-start gap-3">
+                        <div
+                          className={cn(
+                            'flex h-10 w-10 shrink-0 items-center justify-center rounded-lg',
+                            destaque
+                              ? 'bg-primary text-primary-foreground'
+                              : 'bg-accent text-accent-foreground',
+                          )}
+                        >
+                          <Icone className="h-5 w-5" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="font-semibold truncate">{r.nome}</div>
+                          <div className="text-sm text-muted-foreground mt-1 line-clamp-2">
+                            {r.descricao}
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </button>
-          )
-        })}
-      </div>
+                    </CardContent>
+                  </Card>
+                </button>
+              )
+            })}
+          </div>
+        </section>
+      ))}
     </div>
   )
 }

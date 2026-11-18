@@ -3,6 +3,7 @@ import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import {
   ChevronRight,
   FileSpreadsheet,
+  FolderTree,
   LayoutDashboard,
   LogOut,
   Menu as MenuIcon,
@@ -55,10 +56,45 @@ export function Sidebar() {
     setMobileAberto(false)
   }, [location.pathname])
 
-  const { prontos, livres } = useMemo(() => {
-    const prontos = relatorios.filter((r) => r.filtros !== 'livre')
+  /**
+   * Separa o relatório livre dos "prontos" (que agrupamos por área).
+   * Dentro dos prontos: agrupa por area_id, ordena por area_ordem, "Outros"
+   * (sem área) no fim.
+   */
+  const { prontosGrupos, livres } = useMemo(() => {
     const livres = relatorios.filter((r) => r.filtros === 'livre')
-    return { prontos, livres }
+    const prontos = relatorios.filter((r) => r.filtros !== 'livre')
+
+    const mapa = new Map<
+      string,
+      { chave: string; nome: string; ordem: number; itens: RelatorioInfo[] }
+    >()
+    for (const r of prontos) {
+      let chave: string, nome: string, ordem: number
+      if (r.area_id == null) {
+        chave = 'outros'
+        nome = 'Outros'
+        ordem = Number.MAX_SAFE_INTEGER
+      } else {
+        chave = `area:${r.area_id}`
+        nome = r.area_nome ?? '(sem nome)'
+        ordem = r.area_ordem ?? 0
+      }
+      let g = mapa.get(chave)
+      if (!g) {
+        g = { chave, nome, ordem, itens: [] }
+        mapa.set(chave, g)
+      }
+      g.itens.push(r)
+    }
+    const prontosGrupos = Array.from(mapa.values())
+    prontosGrupos.sort(
+      (a, b) => a.ordem - b.ordem || a.nome.localeCompare(b.nome, 'pt-BR'),
+    )
+    for (const g of prontosGrupos) {
+      g.itens.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
+    }
+    return { prontosGrupos, livres }
   }, [relatorios])
 
   return (
@@ -103,21 +139,31 @@ export function Sidebar() {
 
         {/* Conteúdo scrollável */}
         <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-6">
-          {/* RELATÓRIOS PRONTOS */}
-          <Secao
-            titulo="Relatórios prontos"
-            icone={<FileSpreadsheet className="h-3.5 w-3.5" />}
-          >
-            {prontos.length === 0 && <ItemVazio texto="Nenhum disponível" />}
-            {prontos.map((r) => (
-              <ItemNav
-                key={r.id}
-                to={`/relatorios/${r.id}`}
-                label={r.nome}
-                compact
-              />
-            ))}
-          </Secao>
+          {/* RELATÓRIOS PRONTOS, AGRUPADOS POR ÁREA */}
+          {prontosGrupos.length === 0 && (
+            <Secao
+              titulo="Relatórios prontos"
+              icone={<FileSpreadsheet className="h-3.5 w-3.5" />}
+            >
+              <ItemVazio texto="Nenhum disponível" />
+            </Secao>
+          )}
+          {prontosGrupos.map((g) => (
+            <Secao
+              key={g.chave}
+              titulo={g.nome}
+              icone={<FolderTree className="h-3.5 w-3.5" />}
+            >
+              {g.itens.map((r) => (
+                <ItemNav
+                  key={r.id}
+                  to={`/relatorios/${r.id}`}
+                  label={r.nome}
+                  compact
+                />
+              ))}
+            </Secao>
+          ))}
 
           {/* RELATÓRIO LIVRE */}
           <Secao titulo="Relatório livre" icone={<Wand2 className="h-3.5 w-3.5" />}>
@@ -159,6 +205,11 @@ export function Sidebar() {
                 to="/admin/usuarios"
                 label="Usuários"
                 icon={<Users className="h-4 w-4" />}
+              />
+              <ItemNav
+                to="/admin/areas"
+                label="Áreas"
+                icon={<FolderTree className="h-4 w-4" />}
               />
               <ItemNav
                 to="/admin/logs"
