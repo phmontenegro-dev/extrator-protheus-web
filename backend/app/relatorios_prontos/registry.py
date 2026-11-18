@@ -17,7 +17,7 @@ Para adicionar um novo relatório pronto:
 from typing import Literal, TypedDict
 
 
-TipoFiltro = Literal["nenhum", "periodo", "filial_periodo", "livre"]
+TipoFiltro = Literal["nenhum", "periodo", "filial_periodo", "livre", "sql"]
 
 
 class RelatorioInfo(TypedDict):
@@ -124,6 +124,20 @@ RELATORIOS: list[RelatorioInfo] = [
             "as colunas desejadas e opcionalmente um período de datas."
         ),
         "filtros": "livre",
+    },
+    # Código SQL — mesma lógica do Relatório Livre, mas pra executar SELECT
+    # direto. Rota própria em /sql-livre/*. Super restrito: validador recusa
+    # tudo que não seja SELECT, timeout curto, só quem for admin ou tiver
+    # permissão explícita.
+    {
+        "id": "codigo_sql",
+        "nome": "Código SQL",
+        "descricao": (
+            "Execute consultas SELECT livres no Oracle Protheus. "
+            "Ferramenta avançada para administradores — bloqueia qualquer "
+            "comando que não seja de leitura."
+        ),
+        "filtros": "sql",
     },
 ]
 

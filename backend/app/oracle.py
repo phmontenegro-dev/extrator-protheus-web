@@ -10,12 +10,17 @@ import oracledb
 from app.config import get_settings
 
 
-def get_oracle_connection():
+def get_oracle_connection(timeout_s: int | None = None):
     """
     Abre uma conexão nova com o Oracle Protheus e aplica call_timeout.
 
     Importante: o call_timeout é em milissegundos. Cada chamada ao banco
     (execute, fetch) respeita esse limite individualmente.
+
+    Args:
+        timeout_s: sobrescreve o timeout padrão do .env (ORACLE_QUERY_TIMEOUT_S).
+                   Útil para consultas ad-hoc (SQL livre) que devem ter um
+                   limite mais apertado que relatórios programados.
     """
     settings = get_settings()
     dsn = oracledb.makedsn(
@@ -28,8 +33,8 @@ def get_oracle_connection():
         password=settings.oracle_password,
         dsn=dsn,
     )
-    # Timeout por chamada (ms). Default: 10 minutos.
-    conn.call_timeout = settings.oracle_query_timeout_s * 1000
+    timeout_final = timeout_s if timeout_s is not None else settings.oracle_query_timeout_s
+    conn.call_timeout = timeout_final * 1000
     return conn
 
 

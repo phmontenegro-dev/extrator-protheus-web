@@ -10,7 +10,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
-from app.routers import admin, admin_areas, auth, health, relatorio_livre, relatorios
+from app.routers import admin, admin_areas, auth, health, relatorio_livre, relatorios, sql_livre
 
 
 settings = get_settings()
@@ -37,6 +37,7 @@ app.include_router(health.router)
 app.include_router(auth.router)
 app.include_router(relatorios.router)
 app.include_router(relatorio_livre.router)
+app.include_router(sql_livre.router)
 app.include_router(admin.router)
 app.include_router(admin_areas.router)
 
