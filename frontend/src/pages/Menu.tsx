@@ -33,6 +33,7 @@ const ICONES: Record<string, typeof FileSpreadsheet> = {
   sh6_suzano: BarChart3,
   consolidado_suzano_jhon: BarChart3,
   paradas_maquina: Timer,
+  sh6_produtivolote: Truck,
   relatorio_livre: Sparkles,
   codigo_sql: TerminalSquare,
 }

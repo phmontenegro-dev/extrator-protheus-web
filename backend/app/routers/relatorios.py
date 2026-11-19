@@ -45,6 +45,9 @@ from app.relatorios_prontos.consolidado_suzano_jhon.extrair import extrair_conso
 from app.relatorios_prontos.consolidado_suzano_jhon.tratar import tratar_dataframe as tratar_consolidado_suzano_jhon
 from app.relatorios_prontos.paradas_maquina.extrair import extrair_paradas_maquina
 from app.relatorios_prontos.paradas_maquina.tratar import tratar_dataframe as tratar_paradas_maquina
+from app.relatorios_prontos.sh6_produtivolote.extrair import extrair_sh6_produtivolote
+from app.relatorios_prontos.sh6_produtivolote.tratar import tratar_dataframe as tratar_sh6_produtivolote
+
 
 from app.models.area import Area
 from app.models.relatorio_area import RelatorioArea
@@ -206,6 +209,39 @@ def paradas_maquina(filtros: FiltrosPeriodo, request: Request,
         extrair_fn=lambda: extrair_paradas_maquina(di, df),
         tratar_fn=tratar_paradas_maquina,
         parametros_log={"data_inicio": di, "data_fim": df},
+    )
+
+from app.relatorios_prontos.sh6_produtivolote.extrair import extrair_sh6_produtivolote
+from app.relatorios_prontos.sh6_produtivolote.tratar import (
+    tratar_dataframe as tratar_sh6_produtivolote,
+)
+
+
+@router.post("/sh6_produtivolote/extrair")
+def sh6_produtivolote(
+    filtros: FiltrosPeriodo,
+    request: Request,
+    db: Session = Depends(get_db),
+    usuario: Usuario = Depends(get_usuario_atual),
+    cliente: str | None = None,
+) -> StreamingResponse:
+    """Aceita o código exato do cliente pelo parâmetro opcional `?cliente=00001235`."""
+    di, df = filtros.para_aaaammdd()
+    cliente = (cliente or "").strip() or None
+
+    parametros_log = {"data_inicio": di, "data_fim": df}
+    if cliente is not None:
+        parametros_log["cliente"] = cliente
+
+    return executar_e_responder_csv(
+        db=db,
+        request=request,
+        usuario=usuario,
+        relatorio_id="sh6_produtivolote",
+        nome_arquivo=f"SH6_ProdutivoPorLote_0101001_{di}_a_{df}.csv",
+        extrair_fn=lambda: extrair_sh6_produtivolote(di, df, cliente),
+        tratar_fn=tratar_sh6_produtivolote,
+        parametros_log=parametros_log,
     )
 
 

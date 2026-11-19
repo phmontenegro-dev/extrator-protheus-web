@@ -61,6 +61,12 @@ class Settings(BaseSettings):
     # Dias de retenção; passado isso o cronjob apaga o CSV e a linha do banco.
     jobs_retencao_dias: int = 1
 
+    # ----- Agendamentos (Etapa 14) -----
+    # Base pública da API que será embutida no script sincronizador baixado
+    # pelo usuário. Precisa ser o endereço que a máquina do usuário vê
+    # (http://192.168.3.128 ou https://extrator.technocoat.local).
+    api_base_externa: str = "http://localhost:8000"
+
     @property
     def cors_origins_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]

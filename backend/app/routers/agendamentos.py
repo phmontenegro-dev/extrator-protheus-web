@@ -337,10 +337,10 @@ def _montar_api_base() -> str:
     """
     Endereço base da API que será embutido no script.
 
-    Preferência: variável `API_BASE_EXTERNA` (configurável no .env — usado em
-    produção). Fallback: hostname + 8000.
+    Vem de `API_BASE_EXTERNA` no .env (settings.api_base_externa).
     """
-    return os.getenv("API_BASE_EXTERNA") or "http://localhost:8000"
+    from app.config import get_settings
+    return get_settings().api_base_externa
 
 
 # =============================================================================

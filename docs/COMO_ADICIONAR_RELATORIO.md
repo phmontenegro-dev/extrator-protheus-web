@@ -343,21 +343,87 @@ def meu_id(filtros: FiltrosFilialPeriodo, request: Request,
 
 Você não precisa pensar em nada disso.
 
-## Passo 6 — (Opcional) Ícone no menu
+## Passo 6 — Ajustes no frontend
 
-Em `frontend/src/pages/Menu.tsx`, mapa `ICONES`:
+O `RelatorioGenerico.tsx` já atende os 3 tipos de filtros (`nenhum`,
+`periodo`, `filial_periodo`) sem precisar de código novo — ele olha o
+campo `filtros` que vem do `/relatorios` e renderiza o formulário certo.
+
+Só tem 2 coisas que valem ajustar no frontend (ambos **opcionais**, o
+relatório funciona sem eles):
+
+### 6.1 — Ícone no menu e na sidebar
+
+Hoje cada card no menu principal tem um ícone (ex: 🧾 pro CT2010, ⚗️ pro
+QPR010). Se você não configurar, seu relatório ganha o ícone padrão
+`FileSpreadsheet` — fica aceitável. Pra customizar:
+
+Abre **`frontend/src/pages/Menu.tsx`**.
+
+**a)** No topo, junto dos outros imports da `lucide-react`, adiciona o
+nome do ícone que você escolheu:
+
+```tsx
+import {
+  BarChart3, Beaker, Boxes, FileSpreadsheet, Inbox, Package,
+  Receipt, ScrollText, Sparkles, TerminalSquare, Timer, Truck,
+  Users,   // ← novo — importa do https://lucide.dev/icons
+} from 'lucide-react'
+```
+
+**b)** Mais abaixo, adiciona uma entrada no mapa `ICONES`:
 
 ```tsx
 const ICONES: Record<string, typeof FileSpreadsheet> = {
   ct2010: ScrollText,
   qpr010: Beaker,
   // ...
-  sa1_clientes: Users,   // ← adiciona o seu com ícone da lucide-react
+  sa1_clientes: Users,   // ← seu relatório aqui, com o ícone importado acima
 }
 ```
 
-Se não adicionar, ganha o ícone padrão `FileSpreadsheet` — também fica bom.
-Lista de ícones disponíveis: https://lucide.dev/icons
+> **Dica**: catálogo de ícones em https://lucide.dev/icons. Escolha algo
+> que representa o conteúdo — pessoas (`Users`), dinheiro (`Wallet`,
+> `Receipt`), produção (`Factory`, `Package`), tempo (`Timer`, `Clock`).
+> O estilo é consistente, qualquer ícone combina visualmente.
+
+> O **Sidebar** usa o ícone genérico `ChevronRight` pros relatórios prontos
+> e não precisa ser alterado — o mapa `ICONES` só afeta os cards do menu
+> principal e a tela `/jobs`.
+
+### 6.2 — Atribuir o relatório a uma área (sem código)
+
+Toda vez que um relatório novo aparece na listagem, ele cai na seção
+**"Outros"** no menu até que um admin o atribua a uma área (Contábil,
+Fiscal, Produção, etc.). Isso é feito pelo painel, sem mexer em código:
+
+1. Login como admin → menu lateral **Áreas** (ou direto em `/admin/areas`)
+2. Na segunda seção da tela, encontra o relatório recém-criado na coluna
+   "Sem área"
+3. Seleciona a área desejada no dropdown → o relatório some de "Outros"
+   e aparece agrupado no menu
+
+Se a área ainda não existe (ex: um relatório de "Logística" sendo o
+primeiro do grupo), cria ela antes na mesma tela.
+
+### 6.3 — Build do frontend em produção
+
+Se mexeu no `Menu.tsx` (passo 6.1), precisa rebuildar o frontend pra
+distribuir. Em dev, o `npm run dev` já recarrega sozinho. Em produção:
+
+```bash
+cd /opt/extrator-protheus/frontend
+sudo -u extrator npm run build
+```
+
+O FastAPI serve estaticamente de `frontend/dist/` — não precisa reiniciar
+o backend.
+
+### 6.4 — Permissão de acesso (sem código também)
+
+Admin vê todos os relatórios automaticamente. **Usuário comum** precisa
+ter a permissão liberada individualmente — painel `/admin/usuarios/:id`,
+marca o relatório novo na lista e salva.
 
 ## Passo 7 — Testar localmente
 
@@ -397,15 +463,25 @@ sudo -u extrator /opt/extrator-protheus/deploy/deploy.sh
 
 Pra não esquecer nada:
 
+**Backend** (obrigatório):
 - [ ] `backend/app/relatorios_prontos/<id>/__init__.py` (vazio)
 - [ ] `backend/app/relatorios_prontos/<id>/extrair.py` com função `extrair_<id>`
 - [ ] `backend/app/relatorios_prontos/<id>/tratar.py` com função `tratar_dataframe`
 - [ ] Entrada em `RELATORIOS` no `registry.py`
 - [ ] 2 imports novos em `routers/relatorios.py` (extrair + tratar)
 - [ ] Endpoint `@router.post("/<id>/extrair")` no mesmo arquivo
-- [ ] (Opcional) Ícone no `ICONES` do `Menu.tsx`
+
+**Frontend** (opcional):
+- [ ] Import do ícone novo no topo do `Menu.tsx`
+- [ ] Entrada no mapa `ICONES` do `Menu.tsx`
+- [ ] `npm run build` em produção se mexeu no frontend
+
+**Pós-deploy** (pelo painel admin, sem código):
+- [ ] Atribuiu uma área ao relatório em `/admin/areas` (ou deixou em "Outros")
+- [ ] Liberou permissão pros usuários não-admin em `/admin/usuarios/:id`
+
+**Validação**:
 - [ ] Testou localmente e baixou o CSV
-- [ ] Liberou permissão pros usuários não-admin no painel
 - [ ] `git push` + `deploy.sh` na VM
 
 ---

@@ -112,6 +112,17 @@ RELATORIOS: list[RelatorioInfo] = [
         ),
         "filtros": "periodo",
     },
+
+
+    {
+        "id": "sh6_produtivolote",
+        "nome": "SH6 - Relatório Produtivo por Lote",
+        "descricao": "Relatório produtivo por lote.",
+        "filtros": "periodo",
+    },
+
+
+
     # Relatório Livre não é um "relatório pronto" — é uma ferramenta de
     # extração ad hoc. Fica no registry por conveniência: aparece no menu,
     # no sistema de permissões e nos logs igual aos outros, mas tem rota
