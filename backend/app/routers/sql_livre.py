@@ -19,6 +19,7 @@ import io
 import time
 from datetime import datetime
 
+import oracledb
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
@@ -66,13 +67,39 @@ def _validar_ou_422(sql: str) -> str:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(e))
 
 
+# Limite de caracteres pra CLOB/NCLOB — valores maiores são truncados.
+# 20000 é generoso pra observação por humano mas protege o JSON de ficar MB.
+_LOB_CHARS_MAX = 20_000
+
+
 def _normalizar_valor(v):
-    """Converte valores Oracle pra tipos serializáveis em JSON/CSV."""
+    """Converte valores Oracle pra tipos serializáveis em JSON/CSV.
+
+    Pontos-chave:
+      - LOB (CLOB/NCLOB/BLOB) é um objeto lazy do oracledb — precisa .read().
+        CLOB/NCLOB viram string (truncada em _LOB_CHARS_MAX).
+        BLOB vira "<binário omitido>" pra não vazar MB no JSON.
+      - bytes/bytearray também são binários diretos — mesma política.
+      - datetime vira string ISO-like formatável no Excel.
+    """
     if v is None:
         return None
+    # LOB — precisa ler ANTES de verificar tipos primitivos, pois oracledb.LOB
+    # não é instance de bytes/str.
+    if isinstance(v, oracledb.LOB):
+        try:
+            tipo = v.type
+            if tipo in (oracledb.DB_TYPE_CLOB, oracledb.DB_TYPE_NCLOB):
+                s = v.read() or ""
+                if len(s) > _LOB_CHARS_MAX:
+                    return s[:_LOB_CHARS_MAX] + "...<truncado>"
+                return s
+            # BLOB ou RAW grande: não serializa o binário
+            return "<binário omitido>"
+        except Exception:
+            return "<lob não pôde ser lido>"
     if isinstance(v, (bytes, bytearray)):
-        # Pode acontecer com RAW/BLOB — mostra como hex truncado, pra evitar
-        # vazamento de binário gigante no JSON.
+        # RAW/BLOB em caminho síncrono também cai aqui.
         return "<binário omitido>"
     if isinstance(v, datetime):
         return v.strftime("%Y-%m-%d %H:%M:%S")

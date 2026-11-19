@@ -46,8 +46,6 @@ from app.relatorios_prontos.consolidado_suzano_jhon.extrair import extrair_conso
 from app.relatorios_prontos.consolidado_suzano_jhon.tratar import tratar_dataframe as tratar_consolidado_suzano_jhon
 from app.relatorios_prontos.paradas_maquina.extrair import extrair_paradas_maquina
 from app.relatorios_prontos.paradas_maquina.tratar import tratar_dataframe as tratar_paradas_maquina
-from app.relatorios_prontos.sh6_produtivolote.extrair import extrair_sh6_produtivolote
-from app.relatorios_prontos.sh6_produtivolote.tratar import tratar_dataframe as tratar_sh6_produtivolote
 
 log = logging.getLogger(__name__)
 
@@ -83,8 +81,6 @@ def _f_sd1(f: dict):
     return lambda: extrair_sd1_suzano()
 def _f_sd2(f: dict):
     return lambda: extrair_sd2_suzano()
-def _f_sh6_produtivolote(f: dict):
-    return lambda: extrair_sh6_produtivolote(f["data_inicio"], f["data_fim"])
 
 
 RUNNERS_PRONTOS: dict[str, tuple[Any, Any]] = {
@@ -99,7 +95,6 @@ RUNNERS_PRONTOS: dict[str, tuple[Any, Any]] = {
     "sh6_suzano": (_f_sh6_suzano, tratar_sh6_suzano),
     "consolidado_suzano_jhon": (_f_consolidado, tratar_consolidado_suzano_jhon),
     "paradas_maquina": (_f_paradas, tratar_paradas_maquina),
-    "sh6_produtivolote": (_f_sh6_produtivolote, tratar_sh6_produtivolote),
 }
 
 
@@ -198,9 +193,25 @@ def runner_relatorio_livre(filtros: dict, nome_arquivo: str):
 # Runner: código SQL
 # -----------------------------------------------------------------------------
 
+import oracledb
+
+_LOB_CHARS_MAX = 20_000
+
+
 def _normalizar_valor(v):
+    """CLOB/BLOB viram texto (CLOB) ou placeholder (BLOB) — ver sql_livre.py."""
     if v is None:
         return None
+    if isinstance(v, oracledb.LOB):
+        try:
+            if v.type in (oracledb.DB_TYPE_CLOB, oracledb.DB_TYPE_NCLOB):
+                s = v.read() or ""
+                if len(s) > _LOB_CHARS_MAX:
+                    return s[:_LOB_CHARS_MAX] + "...<truncado>"
+                return s
+            return "<binário omitido>"
+        except Exception:
+            return "<lob não pôde ser lido>"
     if isinstance(v, (bytes, bytearray)):
         return "<binário omitido>"
     if isinstance(v, datetime):
