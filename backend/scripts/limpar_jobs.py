@@ -29,10 +29,8 @@ sys.path.insert(0, str(HERE.parent))
 
 from app.config import get_settings  # noqa: E402
 from app.database import SessionLocal  # noqa: E402
-from app.models.job import STATUS_ATIVOS, STATUS_ERRO, JobExtracao  # noqa: E402
-
-
-LIMITE_ZUMBI_HORAS = 4  # job ativo há mais que isso = processo morreu no meio
+from app.jobs.watchdog import marcar_zumbis_agora  # noqa: E402
+from app.models.job import JobExtracao  # noqa: E402
 
 logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(message)s",
@@ -43,29 +41,11 @@ log = logging.getLogger("limpar_jobs")
 
 def _marcar_zumbis(db) -> int:
     """
-    Jobs presos em status ativo há muito tempo são marcados como erro.
-    Acontece quando o processo é derrubado no meio (reboot, SIGKILL, etc.).
+    Delega pro watchdog central (app/jobs/watchdog.py). Ele já roda a cada
+    60s via scheduler, então quando este script roda (3x/dia) geralmente
+    não tem nada pra marcar — fica como safety net.
     """
-    limite = datetime.now(timezone.utc) - timedelta(hours=LIMITE_ZUMBI_HORAS)
-    zumbis = (
-        db.query(JobExtracao)
-        .filter(
-            JobExtracao.status.in_(STATUS_ATIVOS),
-            # criado_em antigo cobre casos onde iniciado_em é NULL (job nunca
-            # saiu do pendente porque o processo morreu).
-            JobExtracao.criado_em < limite,
-        )
-        .all()
-    )
-    for j in zumbis:
-        j.status = STATUS_ERRO
-        j.erro_mensagem = (
-            f"Job interrompido (sem atividade há mais de {LIMITE_ZUMBI_HORAS}h)."
-        )
-        j.concluido_em = datetime.now(timezone.utc)
-    if zumbis:
-        db.commit()
-    return len(zumbis)
+    return marcar_zumbis_agora(db)
 
 
 def _apagar_expirados(db, pasta_jobs: Path, dias: int) -> tuple[int, int]:

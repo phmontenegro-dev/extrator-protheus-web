@@ -16,6 +16,7 @@ from app.jobs.executor import desligar_executor, iniciar_executor
 from app.routers import (
     admin,
     admin_areas,
+    agendamentos,
     auth,
     health,
     jobs,
@@ -62,6 +63,7 @@ app.include_router(relatorios.router)
 app.include_router(relatorio_livre.router)
 app.include_router(sql_livre.router)
 app.include_router(jobs.router)
+app.include_router(agendamentos.router)
 app.include_router(admin.router)
 app.include_router(admin_areas.router)
 

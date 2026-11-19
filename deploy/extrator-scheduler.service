@@ -1,0 +1,62 @@
+[Unit]
+Description=Extrator Protheus — Scheduler de agendamentos (Etapa 14)
+Documentation=https://github.com/montenegro-dev-ti/extrator-protheus-web
+# Sobe só depois do Postgres e da rede. O scheduler não precisa do uvicorn,
+# mas se este cair o scheduler continua rodando (vale também o inverso).
+After=network-online.target postgresql.service
+Wants=network-online.target
+Requires=postgresql.service
+
+[Service]
+Type=exec
+User=extrator
+Group=extrator
+
+WorkingDirectory=/opt/extrator-protheus/backend
+
+# Reaproveita o mesmo .env que o uvicorn.
+EnvironmentFile=/opt/extrator-protheus/backend/.env
+
+# Processo python standalone — loop infinito, tick de 60s.
+ExecStart=/opt/extrator-protheus/backend/.venv/bin/python scripts/scheduler.py
+
+# Restart com backoff.
+Restart=always
+RestartSec=5
+
+# Scheduler trata SIGTERM/SIGINT dentro do loop (sai no fim do tick).
+KillMode=mixed
+KillSignal=SIGTERM
+TimeoutStopSec=90
+
+# ==== Hardening (espelha extrator-backend.service) ====
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+# Escrita permitida só em /opt/... (pycache) e /var/lib/extrator (CSVs dos jobs
+# disparados pelos agendamentos). Precisa coincidir com PASTA_JOBS no .env.
+ReadWritePaths=/opt/extrator-protheus/backend /var/lib/extrator
+CapabilityBoundingSet=
+AmbientCapabilities=
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+
+# ==== Limites de memória (cgroup v2) ====
+# Scheduler só agenda e dispatcha — não executa tratamento pesado. 1G sobra.
+MemoryAccounting=yes
+MemoryHigh=800M
+MemoryMax=1G
+
+# Traceback de signals (SIGSEGV, SIGABRT) no journal.
+Environment=PYTHONFAULTHANDLER=1
+
+# Logs vão pro journald (`journalctl -u extrator-scheduler`).
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=extrator-scheduler
+
+LimitNOFILE=4096
+
+[Install]
+WantedBy=multi-user.target

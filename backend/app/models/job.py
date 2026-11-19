@@ -105,6 +105,14 @@ class JobExtracao(Base):
     # None se não tiver histórico; o front mostra barra indeterminada.
     duracao_estimada_s: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
 
+    # Heartbeat: a thread de progresso atualiza esse campo a cada 2s enquanto
+    # o job estiver ativo. O watchdog (scheduler) usa isso pra detectar jobs
+    # zumbis — se heartbeat_em < now() - 60s e status ainda está ativo, marca
+    # como erro. Null até o primeiro tick da thread de progresso.
+    heartbeat_em: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True, index=True
+    )
+
     criado_em: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now(), index=True
     )

@@ -36,6 +36,19 @@ tela de jobs. Se um dia precisar escalar, o ponto de troca é só o
    sudo chmod 750 /var/lib/extrator/jobs
    ```
 
+   > **Atenção — hardening do systemd**: o unit `extrator-backend.service`
+   > usa `ProtectSystem=strict`, que torna todo o filesystem read-only
+   > exceto os paths listados em `ReadWritePaths=`. Precisa que
+   > `/var/lib/extrator` esteja lá, ou o `to_csv()` quebra com
+   > "Read-only file system". A versão desse repo já tem — se você tem
+   > um `.service` antigo copiado, acrescente `/var/lib/extrator` na
+   > linha e rode:
+   >
+   > ```bash
+   > sudo systemctl daemon-reload
+   > sudo systemctl restart extrator-backend
+   > ```
+
 2. Variáveis no `.env`:
 
    ```
@@ -98,6 +111,18 @@ Testar manualmente:
 sudo -u extrator /opt/extrator-protheus/backend/.venv/bin/python \
     /opt/extrator-protheus/backend/scripts/limpar_jobs.py
 ```
+
+## Watchdog de jobs zumbis
+
+A partir da migration 0005, cada job tem a coluna `heartbeat_em`. A thread
+de progresso (que já roda em paralelo ao job) atualiza esse campo a cada
+2s. O serviço `extrator-scheduler` roda um loop a cada 60s e marca como
+`erro` qualquer job em status ativo cujo heartbeat está parado há mais de
+**2 minutos**.
+
+Isso cobre o caso em que o worker do uvicorn morre em silêncio (segfault
+em lib nativa, kill externo, OOM user-space) — antes dessa correção os
+jobs ficavam "tratando 95%" eternamente, ou até a limpeza de 4h passar.
 
 ## Limites e trade-offs
 

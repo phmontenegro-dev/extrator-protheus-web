@@ -175,10 +175,13 @@ class JobContext:
 
 def _loop_progresso(job_id: str, stop_event: threading.Event) -> None:
     """
-    Thread leve que atualiza `progresso_pct` periodicamente. Para quando o
-    stop_event dispara, OU quando o status vira final.
+    Thread leve que roda em paralelo ao job pra:
+      1. atualizar `progresso_pct` baseado no ETA
+      2. atualizar `heartbeat_em` a cada tick (watchdog usa isso pra
+         detectar jobs zumbis — worker morreu sem marcar status final)
+
+    Para quando o stop_event dispara OU quando o status vira final.
     """
-    settings = get_settings()
     while not stop_event.is_set():
         try:
             with _sessao_thread() as db:
@@ -187,10 +190,12 @@ def _loop_progresso(job_id: str, stop_event: threading.Event) -> None:
                     return
                 if job.status not in STATUS_ATIVOS:
                     return
-                if job.iniciado_em is None or job.duracao_estimada_s is None:
-                    # Sem ETA → barra fica indeterminada (pct 0 + status ativo).
-                    pass
-                else:
+
+                # Heartbeat — sempre. Mesmo sem ETA, isso prova que a thread
+                # tá viva e processando. Ausência disso por >60s = zumbi.
+                job.heartbeat_em = datetime.now(timezone.utc)
+
+                if job.iniciado_em is not None and job.duracao_estimada_s is not None:
                     elapsed = (
                         datetime.now(timezone.utc) - job.iniciado_em
                     ).total_seconds()
@@ -198,7 +203,7 @@ def _loop_progresso(job_id: str, stop_event: threading.Event) -> None:
                     # Nunca "volta" o progresso.
                     if novo > job.progresso_pct:
                         job.progresso_pct = novo
-                        db.commit()
+                db.commit()
         except Exception:
             # Thread de progresso é best-effort. Nunca deve derrubar o worker.
             log.exception("erro na thread de progresso do job %s", job_id)

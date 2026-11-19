@@ -48,19 +48,37 @@ TimeoutStopSec=30
 
 # ==== Hardening ====
 # Nega escrita em qualquer lugar fora do working directory + /tmp.
-# ReadWritePaths lista caminhos onde o processo PODE escrever (útil pra
-# futuros logs/arquivos temporários — hoje nada escrito fora de memória).
+# ReadWritePaths lista caminhos onde o processo PODE escrever:
+#   - /opt/extrator-protheus/backend  → logs internos, .pyc, etc.
+#   - /var/lib/extrator               → CSVs dos jobs assíncronos (Etapa 11).
+#     Precisa casar com PASTA_JOBS no .env. Sem essa entrada, qualquer
+#     to_csv()/open() pra lá falha com "Read-only file system".
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
-ReadWritePaths=/opt/extrator-protheus/backend
+ReadWritePaths=/opt/extrator-protheus/backend /var/lib/extrator
 # Limita capacidades do kernel (não precisa de nenhuma).
 CapabilityBoundingSet=
 AmbientCapabilities=
 # Restringe chamadas de sistema estranhas ao padrão de uma app Python.
 SystemCallFilter=@system-service
 SystemCallErrorNumber=EPERM
+
+# ==== Limites de memória (cgroup v2) ====
+# Com esses limites, o systemd aplica controle de memória antes do kernel
+# OOM killer entrar em cena — e DEIXA LOG no journal quando atua. Isso
+# resolve o problema "worker morre em silêncio" que vimos em 19/11.
+# Ajuste MemoryMax conforme a RAM total da VM; MemoryHigh é soft (começa
+# a pressionar a swap) e MemoryMax é hard (kill).
+MemoryAccounting=yes
+MemoryHigh=2G
+MemoryMax=2500M
+
+# Deixa o Python gerar traceback de signals (SIGSEGV, SIGABRT, etc) antes
+# de morrer. Aparece no journalctl — essencial pra diagnosticar crash
+# em lib nativa (oracledb, numpy).
+Environment=PYTHONFAULTHANDLER=1
 
 # Logs vão pro journald automaticamente (`journalctl -u extrator-backend`).
 StandardOutput=journal

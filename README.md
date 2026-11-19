@@ -86,6 +86,7 @@ Veja o guia completo em [docs/SETUP_UBUNTU.md](docs/SETUP_UBUNTU.md).
 - [Deploy em produção](docs/DEPLOY_PRODUCAO.md) · [Passo a passo iniciante](docs/DEPLOY_PASSO_A_PASSO.md)
 - [**Como adicionar um novo relatório pronto**](docs/COMO_ADICIONAR_RELATORIO.md) ← consulta durante o desenvolvimento
 - [Jobs assíncronos — infra e operação](docs/JOBS_ASSINCRONOS.md) · exige pasta `/var/lib/extrator/jobs/` + cron
+- [Agendamentos — infra e operação](docs/AGENDAMENTOS.md) · exige serviço `extrator-scheduler.service` + `API_BASE_EXTERNA`
 
 Resumo:
 
@@ -154,10 +155,11 @@ Veja `backend/.env.example` para a lista completa. As principais:
 - [x] Melhorias visuais (shadcn-style, tema Technocoat, dark mode, toasts, 404)
 - [x] Divisão de relatórios por área (CRUD + menu agrupado)
 - [x] Tela "Código SQL" (SELECT only, com validador defensivo)
-- [ ] Extração assíncrona (job em background + barra de progresso)
-      _· backend pronto (11a): modelo `JobExtracao`, ThreadPool 2w, ETA via mediana
-      histórica, endpoints /jobs/\* e `-async`, script de limpeza._
-      _· pendente: UI (11b) — página /jobs e integração dos formulários._
+- [x] Extração assíncrona (job em background + barra de progresso)
+- [ ] Agendamento de relatórios (recorrência + script sincronizador no PC)
+      _· backend pronto (14a): modelos, scheduler systemd, dispatcher, tokens,
+      endpoints CRUD + execuções + script generator. Ver [docs/AGENDAMENTOS.md](docs/AGENDAMENTOS.md)._
+      _· pendente: UI (14b) — tela de criação/listagem/histórico._
 - [ ] Filtros dinâmicos no Relatório Livre (operadores por tipo de coluna:
       `=`, `>`, `<`, `LIKE`, `BETWEEN`, `IN`) além do filtro de data
 - [ ] Dashboards com gráficos de relatórios pré-definidos (visões analíticas

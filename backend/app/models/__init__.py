@@ -12,6 +12,7 @@ from app.models.sessao import Sessao
 from app.models.area import Area
 from app.models.relatorio_area import RelatorioArea
 from app.models.job import JobExtracao
+from app.models.agendamento import Agendamento, AgendamentoExecucao
 
 __all__ = [
     "Usuario",
@@ -21,4 +22,6 @@ __all__ = [
     "Area",
     "RelatorioArea",
     "JobExtracao",
+    "Agendamento",
+    "AgendamentoExecucao",
 ]
