@@ -1,57 +1,35 @@
 """
-Endpoints de relatórios.
+Endpoints de relatórios prontos (Etapa 11.6 — auto-descoberta).
 
-  GET  /relatorios                                lista os disponíveis
-  POST /relatorios/{id}/extrair                   um endpoint por relatório
+  GET  /relatorios                           lista os disponíveis (filtrada por permissão)
+  POST /relatorios/{id}/extrair              endpoint UNIVERSAL de extração síncrona
 
-Padrão: toda extração passa por `executar_e_responder_csv`, que faz:
-permissão + log + extração + tratamento + resposta CSV. Isso mantém os
-endpoints enxutos — cada um é só uma closure chamando extrair_X + tratar_X
-+ um nome de arquivo.
-
-Para adicionar um novo relatório:
-  1. Criar app/relatorios_prontos/<id>/extrair.py + tratar.py
-  2. Registrar em app/relatorios_prontos/registry.py
-  3. Adicionar endpoint aqui
+Cada relatório pronto é descoberto automaticamente a partir de
+`app.relatorios_prontos.*` — ver `base.py`. Pra adicionar/remover relatório,
+NÃO mexa aqui — crie o pacote/arquivo correspondente.
 """
-from fastapi import APIRouter, Depends, Request
+from typing import Any, Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import StreamingResponse
+from pydantic import BaseModel, ValidationError
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import get_usuario_atual
 from app.database import get_db
-from app.models.usuario import Usuario
-
-from app.relatorios_prontos.registry import RELATORIOS
-from app.relatorios_prontos.ct2010.extrair import extrair_ct2010
-from app.relatorios_prontos.ct2010.tratar import tratar_dataframe as tratar_ct2010
-from app.relatorios_prontos.qpr010.extrair import extrair_qpr010
-from app.relatorios_prontos.qpr010.tratar import tratar_dataframe as tratar_qpr010
-from app.relatorios_prontos.sft010.extrair import extrair_sft010
-from app.relatorios_prontos.sft010.tratar import tratar_dataframe as tratar_sft010
-from app.relatorios_prontos.sd3010.extrair import extrair_sd3010
-from app.relatorios_prontos.sd3010.tratar import tratar_dataframe as tratar_sd3010
-from app.relatorios_prontos.sb8_suzano.extrair import extrair_sb8_suzano
-from app.relatorios_prontos.sb8_suzano.tratar import tratar_dataframe as tratar_sb8_suzano
-from app.relatorios_prontos.sd1_suzano.extrair import extrair_sd1_suzano
-from app.relatorios_prontos.sd1_suzano.tratar import tratar_dataframe as tratar_sd1_suzano
-from app.relatorios_prontos.sd2_suzano.extrair import extrair_sd2_suzano
-from app.relatorios_prontos.sd2_suzano.tratar import tratar_dataframe as tratar_sd2_suzano
-from app.relatorios_prontos.sd4_suzano.extrair import extrair_sd4_suzano
-from app.relatorios_prontos.sd4_suzano.tratar import tratar_dataframe as tratar_sd4_suzano
-from app.relatorios_prontos.sh6_suzano.extrair import extrair_sh6_suzano
-from app.relatorios_prontos.sh6_suzano.tratar import tratar_dataframe as tratar_sh6_suzano
-from app.relatorios_prontos.consolidado_suzano_jhon.extrair import extrair_consolidado_suzano_jhon
-from app.relatorios_prontos.consolidado_suzano_jhon.tratar import tratar_dataframe as tratar_consolidado_suzano_jhon
-from app.relatorios_prontos.paradas_maquina.extrair import extrair_paradas_maquina
-from app.relatorios_prontos.paradas_maquina.tratar import tratar_dataframe as tratar_paradas_maquina
-from app.relatorios_prontos.sh6_produtivolote.extrair import extrair_sh6_produtivolote
-from app.relatorios_prontos.sh6_produtivolote.tratar import tratar_dataframe as tratar_sh6_produtivolote
-
-
 from app.models.area import Area
 from app.models.relatorio_area import RelatorioArea
-from app.schemas.relatorios import FiltrosFilialPeriodo, FiltrosPeriodo, RelatorioInfo
+from app.models.usuario import Usuario
+from app.relatorios_prontos.base import RelatorioPronto
+from app.relatorios_prontos.registry import (
+    RELATORIOS,
+    buscar_pronto,
+)
+from app.schemas.relatorios import (
+    FiltrosFilialPeriodo,
+    FiltrosPeriodo,
+    RelatorioInfo,
+)
 from app.utils.permissoes import relatorios_permitidos
 from app.utils.relatorio_runner import executar_e_responder_csv
 
@@ -75,8 +53,6 @@ def listar(
     area_ordem). Relatórios sem atribuição retornam None nos 3 campos, e
     o frontend os exibe na seção "Outros".
     """
-    # Carrega todas as atribuições relatório→área em uma query só (inner join
-    # com Area). Dict por relatorio_id pra lookup O(1).
     mapa_area: dict[str, tuple[int, str, int]] = {}
     for rel, area in (
         db.query(RelatorioArea, Area)
@@ -104,205 +80,84 @@ def listar(
 
 
 # =============================================================================
-# Relatórios com filtros de PERÍODO (data_inicio + data_fim)
+# POST /{id}/extrair — endpoint único que despacha por tipo de filtro
 # =============================================================================
 
-@router.post("/ct2010/extrair")
-def ct2010(filtros: FiltrosPeriodo, request: Request,
-           db: Session = Depends(get_db),
-           usuario: Usuario = Depends(get_usuario_atual)) -> StreamingResponse:
-    di, df = filtros.para_aaaammdd()
-    return executar_e_responder_csv(
-        db=db, request=request, usuario=usuario,
-        relatorio_id="ct2010",
-        nome_arquivo=f"CT2010_tratado_{di}_a_{df}.csv",
-        extrair_fn=lambda: extrair_ct2010(di, df),
-        tratar_fn=tratar_ct2010,
-        parametros_log={"data_inicio": di, "data_fim": df},
-    )
-
-
-@router.post("/sft010/extrair")
-def sft010(filtros: FiltrosPeriodo, request: Request,
-           db: Session = Depends(get_db),
-           usuario: Usuario = Depends(get_usuario_atual)) -> StreamingResponse:
-    di, df = filtros.para_aaaammdd()
-    return executar_e_responder_csv(
-        db=db, request=request, usuario=usuario,
-        relatorio_id="sft010",
-        nome_arquivo=f"SFT010_tratado_{di}_a_{df}.csv",
-        extrair_fn=lambda: extrair_sft010(di, df),
-        tratar_fn=tratar_sft010,
-        parametros_log={"data_inicio": di, "data_fim": df},
-    )
-
-
-@router.post("/sd3010/extrair")
-def sd3010(filtros: FiltrosPeriodo, request: Request,
-           db: Session = Depends(get_db),
-           usuario: Usuario = Depends(get_usuario_atual)) -> StreamingResponse:
-    di, df = filtros.para_aaaammdd()
-    return executar_e_responder_csv(
-        db=db, request=request, usuario=usuario,
-        relatorio_id="sd3010",
-        nome_arquivo=f"SD3010_tratado_{di}_a_{df}.csv",
-        extrair_fn=lambda: extrair_sd3010(di, df),
-        tratar_fn=tratar_sd3010,
-        parametros_log={"data_inicio": di, "data_fim": df},
-    )
-
-
-@router.post("/sd4_suzano/extrair")
-def sd4_suzano(filtros: FiltrosPeriodo, request: Request,
-               db: Session = Depends(get_db),
-               usuario: Usuario = Depends(get_usuario_atual)) -> StreamingResponse:
-    di, df = filtros.para_aaaammdd()
-    return executar_e_responder_csv(
-        db=db, request=request, usuario=usuario,
-        relatorio_id="sd4_suzano",
-        nome_arquivo=f"SD4_SUZANO_tratado_{di}_a_{df}.csv",
-        extrair_fn=lambda: extrair_sd4_suzano(di, df),
-        tratar_fn=tratar_sd4_suzano,
-        parametros_log={"data_inicio": di, "data_fim": df},
-    )
-
-
-@router.post("/sh6_suzano/extrair")
-def sh6_suzano(filtros: FiltrosPeriodo, request: Request,
-               db: Session = Depends(get_db),
-               usuario: Usuario = Depends(get_usuario_atual)) -> StreamingResponse:
-    di, df = filtros.para_aaaammdd()
-    return executar_e_responder_csv(
-        db=db, request=request, usuario=usuario,
-        relatorio_id="sh6_suzano",
-        nome_arquivo=f"SH6_SUZANO_tratado_{di}_a_{df}.csv",
-        extrair_fn=lambda: extrair_sh6_suzano(di, df),
-        tratar_fn=tratar_sh6_suzano,
-        parametros_log={"data_inicio": di, "data_fim": df},
-    )
-
-
-@router.post("/consolidado_suzano_jhon/extrair")
-def consolidado_suzano_jhon(filtros: FiltrosPeriodo, request: Request,
-                            db: Session = Depends(get_db),
-                            usuario: Usuario = Depends(get_usuario_atual)) -> StreamingResponse:
-    di, df = filtros.para_aaaammdd()
-    return executar_e_responder_csv(
-        db=db, request=request, usuario=usuario,
-        relatorio_id="consolidado_suzano_jhon",
-        nome_arquivo=f"ConsolidadoSuzanoJhon_tratado_{di}_a_{df}.csv",
-        extrair_fn=lambda: extrair_consolidado_suzano_jhon(di, df),
-        tratar_fn=tratar_consolidado_suzano_jhon,
-        parametros_log={"data_inicio": di, "data_fim": df},
-    )
-
-
-@router.post("/paradas_maquina/extrair")
-def paradas_maquina(filtros: FiltrosPeriodo, request: Request,
-                    db: Session = Depends(get_db),
-                    usuario: Usuario = Depends(get_usuario_atual)) -> StreamingResponse:
-    di, df = filtros.para_aaaammdd()
-    return executar_e_responder_csv(
-        db=db, request=request, usuario=usuario,
-        relatorio_id="paradas_maquina",
-        nome_arquivo=f"ParadasMaquina_{di}_a_{df}.csv",
-        extrair_fn=lambda: extrair_paradas_maquina(di, df),
-        tratar_fn=tratar_paradas_maquina,
-        parametros_log={"data_inicio": di, "data_fim": df},
-    )
-
-from app.relatorios_prontos.sh6_produtivolote.extrair import extrair_sh6_produtivolote
-from app.relatorios_prontos.sh6_produtivolote.tratar import (
-    tratar_dataframe as tratar_sh6_produtivolote,
-)
-
-
-@router.post("/sh6_produtivolote/extrair")
-def sh6_produtivolote(
-    filtros: FiltrosPeriodo,
+@router.post("/{relatorio_id}/extrair")
+def extrair_generico(
+    relatorio_id: str,
+    payload: dict[str, Any],
     request: Request,
     db: Session = Depends(get_db),
     usuario: Usuario = Depends(get_usuario_atual),
-    cliente: str | None = None,
 ) -> StreamingResponse:
-    """Aceita o código exato do cliente pelo parâmetro opcional `?cliente=00001235`."""
-    di, df = filtros.para_aaaammdd()
-    cliente = (cliente or "").strip() or None
+    """
+    Endpoint síncrono universal. Despacha pela configuração do RelatorioPronto
+    descoberto automaticamente.
 
-    parametros_log = {"data_inicio": di, "data_fim": df}
-    if cliente is not None:
-        parametros_log["cliente"] = cliente
+    O payload varia conforme o tipo de filtros:
+      - nenhum          → {}  (ou corpo vazio)
+      - periodo         → {"data_inicio": "YYYY-MM-DD", "data_fim": "YYYY-MM-DD"}
+      - filial_periodo  → {"filial": "...", "data_inicio": "...", "data_fim": "..."}
+    """
+    rel = buscar_pronto(relatorio_id)
+    if rel is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Relatório pronto '{relatorio_id}' não existe.",
+        )
+
+    try:
+        filtros_runner, parametros_log = _validar_payload(rel, payload or {})
+    except ValidationError as e:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=e.errors(),
+        )
+
+    nome_arquivo = rel.nome_arquivo(filtros_runner)
 
     return executar_e_responder_csv(
-        db=db,
-        request=request,
-        usuario=usuario,
-        relatorio_id="sh6_produtivolote",
-        nome_arquivo=f"SH6_ProdutivoPorLote_0101001_{di}_a_{df}.csv",
-        extrair_fn=lambda: extrair_sh6_produtivolote(di, df, cliente),
-        tratar_fn=tratar_sh6_produtivolote,
+        db=db, request=request, usuario=usuario,
+        relatorio_id=rel.id,
+        nome_arquivo=nome_arquivo,
+        extrair_fn=lambda: rel.extrair(**filtros_runner),
+        tratar_fn=rel.tratar,
         parametros_log=parametros_log,
     )
 
 
 # =============================================================================
-# Relatório com filtros de FILIAL + PERÍODO
+# Helpers
 # =============================================================================
 
-@router.post("/qpr010/extrair")
-def qpr010(filtros: FiltrosFilialPeriodo, request: Request,
-           db: Session = Depends(get_db),
-           usuario: Usuario = Depends(get_usuario_atual)) -> StreamingResponse:
-    di, df = filtros.para_aaaammdd()
-    filial = filtros.filial.strip()
-    return executar_e_responder_csv(
-        db=db, request=request, usuario=usuario,
-        relatorio_id="qpr010",
-        nome_arquivo=f"QPR010_{filial}_{di}_a_{df}.csv",
-        extrair_fn=lambda: extrair_qpr010(filial, di, df),
-        tratar_fn=tratar_qpr010,
-        parametros_log={"filial": filial, "data_inicio": di, "data_fim": df},
-    )
+def _validar_payload(
+    rel: RelatorioPronto,
+    payload: dict,
+) -> tuple[dict, Optional[dict]]:
+    """
+    Valida o payload contra o schema correto baseado em rel.filtros.
+    Retorna (filtros_para_extrair, parametros_para_log).
+    """
+    if rel.filtros == "nenhum":
+        return {}, None
 
+    if rel.filtros == "periodo":
+        f = FiltrosPeriodo(**payload)
+        di, df = f.para_aaaammdd()
+        return {"data_inicio": di, "data_fim": df}, {"data_inicio": di, "data_fim": df}
 
-# =============================================================================
-# Relatórios SEM filtros (Suzano fixos)
-# =============================================================================
+    if rel.filtros == "filial_periodo":
+        f = FiltrosFilialPeriodo(**payload)
+        di, df = f.para_aaaammdd()
+        fil = f.filial.strip()
+        return (
+            {"filial": fil, "data_inicio": di, "data_fim": df},
+            {"filial": fil, "data_inicio": di, "data_fim": df},
+        )
 
-@router.post("/sb8_suzano/extrair")
-def sb8_suzano(request: Request,
-               db: Session = Depends(get_db),
-               usuario: Usuario = Depends(get_usuario_atual)) -> StreamingResponse:
-    return executar_e_responder_csv(
-        db=db, request=request, usuario=usuario,
-        relatorio_id="sb8_suzano",
-        nome_arquivo="SB8_SUZANO_tratado.csv",
-        extrair_fn=lambda: extrair_sb8_suzano(),
-        tratar_fn=tratar_sb8_suzano,
-    )
-
-
-@router.post("/sd1_suzano/extrair")
-def sd1_suzano(request: Request,
-               db: Session = Depends(get_db),
-               usuario: Usuario = Depends(get_usuario_atual)) -> StreamingResponse:
-    return executar_e_responder_csv(
-        db=db, request=request, usuario=usuario,
-        relatorio_id="sd1_suzano",
-        nome_arquivo="SD1_SUZANO_tratado.csv",
-        extrair_fn=lambda: extrair_sd1_suzano(),
-        tratar_fn=tratar_sd1_suzano,
-    )
-
-
-@router.post("/sd2_suzano/extrair")
-def sd2_suzano(request: Request,
-               db: Session = Depends(get_db),
-               usuario: Usuario = Depends(get_usuario_atual)) -> StreamingResponse:
-    return executar_e_responder_csv(
-        db=db, request=request, usuario=usuario,
-        relatorio_id="sd2_suzano",
-        nome_arquivo="SD2_SUZANO_tratado.csv",
-        extrair_fn=lambda: extrair_sd2_suzano(),
-        tratar_fn=tratar_sd2_suzano,
+    # Defesa (tipo "livre" ou "sql" não deveriam cair aqui — têm rotas próprias)
+    raise HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail=f"Relatório '{rel.id}' tem filtros={rel.filtros!r} que usa endpoint específico.",
     )

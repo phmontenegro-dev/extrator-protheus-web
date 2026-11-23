@@ -14,7 +14,6 @@ import io
 import logging
 import os
 from datetime import datetime
-from typing import Any
 
 from app.jobs.executor import JobContext, caminho_do_csv
 from app.models.job import (
@@ -24,82 +23,19 @@ from app.models.job import (
 )
 from app.oracle import get_oracle_connection
 from app.relatorio_livre.extrair import extrair as extrair_livre
-from app.relatorios_prontos.ct2010.extrair import extrair_ct2010
-from app.relatorios_prontos.ct2010.tratar import tratar_dataframe as tratar_ct2010
-from app.relatorios_prontos.qpr010.extrair import extrair_qpr010
-from app.relatorios_prontos.qpr010.tratar import tratar_dataframe as tratar_qpr010
-from app.relatorios_prontos.sft010.extrair import extrair_sft010
-from app.relatorios_prontos.sft010.tratar import tratar_dataframe as tratar_sft010
-from app.relatorios_prontos.sd3010.extrair import extrair_sd3010
-from app.relatorios_prontos.sd3010.tratar import tratar_dataframe as tratar_sd3010
-from app.relatorios_prontos.sb8_suzano.extrair import extrair_sb8_suzano
-from app.relatorios_prontos.sb8_suzano.tratar import tratar_dataframe as tratar_sb8_suzano
-from app.relatorios_prontos.sd1_suzano.extrair import extrair_sd1_suzano
-from app.relatorios_prontos.sd1_suzano.tratar import tratar_dataframe as tratar_sd1_suzano
-from app.relatorios_prontos.sd2_suzano.extrair import extrair_sd2_suzano
-from app.relatorios_prontos.sd2_suzano.tratar import tratar_dataframe as tratar_sd2_suzano
-from app.relatorios_prontos.sd4_suzano.extrair import extrair_sd4_suzano
-from app.relatorios_prontos.sd4_suzano.tratar import tratar_dataframe as tratar_sd4_suzano
-from app.relatorios_prontos.sh6_suzano.extrair import extrair_sh6_suzano
-from app.relatorios_prontos.sh6_suzano.tratar import tratar_dataframe as tratar_sh6_suzano
-from app.relatorios_prontos.consolidado_suzano_jhon.extrair import extrair_consolidado_suzano_jhon
-from app.relatorios_prontos.consolidado_suzano_jhon.tratar import tratar_dataframe as tratar_consolidado_suzano_jhon
-from app.relatorios_prontos.paradas_maquina.extrair import extrair_paradas_maquina
-from app.relatorios_prontos.paradas_maquina.tratar import tratar_dataframe as tratar_paradas_maquina
+from app.relatorios_prontos.registry import buscar_pronto
 
 log = logging.getLogger(__name__)
 
 
 # -----------------------------------------------------------------------------
-# Registry de relatórios prontos: id → (extrair_fn_factory, tratar_fn)
+# Runner: relatório pronto (auto-descoberta — Etapa 11.6)
 # -----------------------------------------------------------------------------
 #
-# extrair_fn_factory recebe o dict de filtros e devolve a closure a ser
-# chamada (que já embute os parâmetros). Isso mantém a assinatura uniforme
-# do runner.
-# -----------------------------------------------------------------------------
-
-def _f_ct2010(f: dict):
-    return lambda: extrair_ct2010(f["data_inicio"], f["data_fim"])
-def _f_qpr010(f: dict):
-    return lambda: extrair_qpr010(f["filial"], f["data_inicio"], f["data_fim"])
-def _f_sft010(f: dict):
-    return lambda: extrair_sft010(f["data_inicio"], f["data_fim"])
-def _f_sd3010(f: dict):
-    return lambda: extrair_sd3010(f["data_inicio"], f["data_fim"])
-def _f_sd4_suzano(f: dict):
-    return lambda: extrair_sd4_suzano(f["data_inicio"], f["data_fim"])
-def _f_sh6_suzano(f: dict):
-    return lambda: extrair_sh6_suzano(f["data_inicio"], f["data_fim"])
-def _f_consolidado(f: dict):
-    return lambda: extrair_consolidado_suzano_jhon(f["data_inicio"], f["data_fim"])
-def _f_paradas(f: dict):
-    return lambda: extrair_paradas_maquina(f["data_inicio"], f["data_fim"])
-def _f_sb8(f: dict):
-    return lambda: extrair_sb8_suzano()
-def _f_sd1(f: dict):
-    return lambda: extrair_sd1_suzano()
-def _f_sd2(f: dict):
-    return lambda: extrair_sd2_suzano()
-
-
-RUNNERS_PRONTOS: dict[str, tuple[Any, Any]] = {
-    "ct2010": (_f_ct2010, tratar_ct2010),
-    "qpr010": (_f_qpr010, tratar_qpr010),
-    "sft010": (_f_sft010, tratar_sft010),
-    "sd3010": (_f_sd3010, tratar_sd3010),
-    "sb8_suzano": (_f_sb8, tratar_sb8_suzano),
-    "sd1_suzano": (_f_sd1, tratar_sd1_suzano),
-    "sd2_suzano": (_f_sd2, tratar_sd2_suzano),
-    "sd4_suzano": (_f_sd4_suzano, tratar_sd4_suzano),
-    "sh6_suzano": (_f_sh6_suzano, tratar_sh6_suzano),
-    "consolidado_suzano_jhon": (_f_consolidado, tratar_consolidado_suzano_jhon),
-    "paradas_maquina": (_f_paradas, tratar_paradas_maquina),
-}
-
-
-# -----------------------------------------------------------------------------
-# Runner: relatório pronto
+# Não há mais tabela RUNNERS_PRONTOS; o registro vem automaticamente do
+# `app.relatorios_prontos` via base.descobrir_relatorios(). Pra adicionar
+# um relatório, basta criar o arquivo/pasta correspondente exportando
+# `relatorio = RelatorioPronto(...)`.
 # -----------------------------------------------------------------------------
 
 def runner_relatorio_pronto(
@@ -109,22 +45,24 @@ def runner_relatorio_pronto(
     Factory que devolve um runner pronto pra ser passado ao executor.
 
     Fecha sobre o id do relatório, os filtros a aplicar e o nome do CSV final.
+    O relatório precisa estar registrado no auto-descoberta — se não estiver,
+    levanta ValueError (que o dispatcher converte em erro do job).
     """
-    if relatorio_id not in RUNNERS_PRONTOS:
+    rel = buscar_pronto(relatorio_id)
+    if rel is None:
         raise ValueError(f"relatório desconhecido: {relatorio_id}")
-    factory_extrair, tratar_fn = RUNNERS_PRONTOS[relatorio_id]
 
     def _run(ctx: JobContext) -> None:
         ctx.avancar(STATUS_CONSULTANDO)
-        df = factory_extrair(filtros)()
+        df = rel.extrair(**filtros)
 
         if df is None or df.empty:
             ctx.finalizar_erro("Nenhum registro encontrado para os filtros informados.")
             return
 
         ctx.avancar(STATUS_TRATANDO)
-        if tratar_fn is not None:
-            df = tratar_fn(df)
+        if rel.tratar is not None:
+            df = rel.tratar(df)
 
         ctx.avancar(STATUS_ESCREVENDO)
         caminho = caminho_do_csv(ctx.job_id)

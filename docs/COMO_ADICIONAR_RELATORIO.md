@@ -1,57 +1,54 @@
 # Como adicionar um novo relatório pronto
 
-Guia passo a passo para criar um novo "relatório pronto" (com regras de
-negócio específicas, extração + tratamento). Uma vez que a arquitetura tá
-pronta, adicionar um relatório é basicamente:
+A partir da Etapa 11.6 (auto-descoberta), adicionar um relatório é
+basicamente **criar 1 pacote com 3 arquivos**. O backend descobre
+sozinho no startup — zero edição em routers, runners, registry ou
+qualquer outro arquivo.
 
-1. Criar 2 arquivos Python no backend (`extrair.py` + `tratar.py`)
-2. Registrar no `registry.py`
-3. Adicionar um endpoint no `relatorios.py`
-4. (Opcional) Adicionar um ícone no menu
-5. Liberar a permissão pros usuários via painel admin
+## Visão geral
 
-**Zero mudança no frontend** — o `RelatorioGenerico.tsx` já atende os 3 tipos
-de filtros existentes automaticamente.
+```
+backend/app/relatorios_prontos/<id>/
+├── __init__.py        ← registra o relatório (uma declaração)
+├── extrair.py         ← roda o SQL no Oracle, devolve DataFrame
+└── tratar.py          ← renomeia colunas, formata, reordena
+```
+
+Pronto. Restart do backend e o relatório aparece no menu.
 
 ---
 
 ## Antes de começar — decidir o tipo de filtros
 
-O frontend renderiza o formulário certo baseado no campo `filtros` do
-registry. As opções existentes hoje:
-
 | `filtros` | O que o usuário preenche | Exemplos |
 |---|---|---|
-| `"nenhum"` | Nada. Só clica "Extrair CSV" | SB8 Suzano, SD1 Suzano |
+| `"nenhum"` | Nada. Só clica "Extrair" | SB8 Suzano, SD1 Suzano |
 | `"periodo"` | 2 campos de data (ini + fim) | CT2010, SFT010, SD3010 |
 | `"filial_periodo"` | 1 campo filial + 2 campos data | QPR010 |
-| `"livre"` | Interface especial do Relatório Livre | (interno, não usar) |
 
-Se seu relatório precisa de **outros filtros** (ex: vários produtos, cliente
-específico, etc), aí precisa criar uma nova UI — é o escopo da Etapa 12
-(filtros dinâmicos). Até lá, adapte um dos 3 tipos existentes.
+Se seu relatório precisa de **outros filtros** (multi-select, cliente
+específico, etc), aí precisa criar UI custom — não cabe no modelo
+atual. Até lá, adapte um dos 3 tipos existentes.
 
 ---
 
-## Passo 1 — Criar a pasta do relatório
+## Passo 1 — Criar a pasta
 
 Digamos que você vai criar um **"SA1 — Cadastro de Clientes"** sem filtros.
-Convenção de nome do id: minúsculo, snake_case, igual aos outros.
+Convenção de id: minúsculo, snake_case, único.
 
 ```bash
 mkdir -p backend/app/relatorios_prontos/sa1_clientes
-touch backend/app/relatorios_prontos/sa1_clientes/__init__.py
 ```
 
 ## Passo 2 — Criar `extrair.py`
 
-**Template** — copia, cola e adapta:
+Template base:
 
 ```python
 """
 Extração do SA1010 — Cadastro de Clientes.
-
-[Descreva aqui o que o relatório faz, quais filtros fixos, etc.]
+Explique aqui o que o relatório faz e quais filtros fixos usa.
 """
 import pandas as pd
 
@@ -59,20 +56,10 @@ from app.oracle import get_oracle_connection
 
 
 def extrair_sa1_clientes() -> pd.DataFrame:
-    """
-    Extrai o cadastro de clientes ativos.
-    [Explique os parâmetros, se houver.]
-    """
+    """Extrai o cadastro de clientes ativos."""
     query = """
         SELECT
-            A1_COD,
-            A1_LOJA,
-            A1_NOME,
-            A1_NREDUZ,
-            A1_CGC,
-            A1_MUN,
-            A1_EST,
-            A1_TEL
+            A1_COD, A1_LOJA, A1_NOME, A1_NREDUZ, A1_CGC, A1_MUN, A1_EST, A1_TEL
         FROM SA1010
         WHERE A1_MSBLQL = '2'
           AND D_E_L_E_T_ = ' '
@@ -84,17 +71,15 @@ def extrair_sa1_clientes() -> pd.DataFrame:
     finally:
         conn.close()
 
-    # Mantém códigos como texto (preserva zeros à esquerda).
     for col in ["A1_COD", "A1_LOJA", "A1_CGC", "A1_EST"]:
         if col in df.columns:
             df[col] = df[col].astype(str).str.strip()
-
     return df
 ```
 
-### Com filtros de PERÍODO
+### Variações por tipo de filtro
 
-Se fosse `"periodo"`, a função receberia 2 strings `AAAAMMDD`:
+**Período** — função recebe 2 strings `AAAAMMDD`:
 
 ```python
 def extrair_meu_relatorio(data_inicio: str, data_fim: str) -> pd.DataFrame:
@@ -106,74 +91,44 @@ def extrair_meu_relatorio(data_inicio: str, data_fim: str) -> pd.DataFrame:
     """
     conn = get_oracle_connection()
     try:
-        df = pd.read_sql(
-            query, conn,
-            params={"data_inicio": data_inicio, "data_fim": data_fim},
-        )
+        df = pd.read_sql(query, conn,
+                         params={"data_inicio": data_inicio, "data_fim": data_fim})
     finally:
         conn.close()
     return df
 ```
 
-### Com filtros de FILIAL + PERÍODO
-
-Se fosse `"filial_periodo"`, 3 parâmetros:
+**Filial + período** — 3 parâmetros:
 
 ```python
 def extrair_meu_relatorio(filial: str, data_inicio: str, data_fim: str) -> pd.DataFrame:
-    query = """
-        SELECT ...
-        FROM MINHA_TABELA
-        WHERE MINHA_FILIAL = :filial
-          AND MINHA_DATA BETWEEN :data_inicio AND :data_fim
-          AND D_E_L_E_T_ = ' '
-    """
-    params = {"filial": filial, "data_inicio": data_inicio, "data_fim": data_fim}
-    conn = get_oracle_connection()
-    try:
-        df = pd.read_sql(query, conn, params=params)
-    finally:
-        conn.close()
-    return df
+    # mesma coisa, só com +1 bind variable
+    ...
 ```
 
-### Regras importantes
+### Regras do Protheus — sempre seguir
 
-- **Sempre** use `get_oracle_connection()` (de `app.oracle`), NÃO `oracledb.connect()` direto.
-- **Sempre** inclua `D_E_L_E_T_ = ' '` em cada tabela do Protheus.
-- **Sempre** use bind variables (`:data_inicio`) para valores — nunca interpole.
-- Faça `strip()` nos códigos para preservar zeros à esquerda.
-- Fechar a conexão com `conn.close()` dentro do `finally`.
-- **Nomes de tabela Protheus sempre têm sufixo `010`** (empresa 01, filial 0):
-  `SB1010`, `SH6010`, `CYN010`, etc. Se um SELECT recebido de outra ferramenta
-  (Totvs Query, ADV/PL) cita a tabela sem o sufixo, confirme no dicionário
-  Oracle antes de rodar:
-  ```sql
-  SELECT table_name FROM all_tables WHERE table_name LIKE 'XXX%' ORDER BY table_name;
-  ```
+- `get_oracle_connection()` de `app.oracle`, NÃO `oracledb.connect()` direto
+- `D_E_L_E_T_ = ' '` em cada tabela Protheus (filtra deletados)
+- Bind variables (`:data_inicio`) — nunca interpole valores
+- `strip()` em códigos pra preservar zeros à esquerda
+- Fechar conexão no `finally`
+- Nomes de tabela sempre com sufixo `010`: `SB1010`, `CYN010`, `SH1010`. Se
+  seu SQL vier de outra ferramenta citando sem sufixo (ex: `FROM CYN C`),
+  CORRIJA pra `CYN010`
 
 ## Passo 3 — Criar `tratar.py`
 
-**Template** — base que você adapta:
+Template base:
 
 ```python
-"""
-Tratamento pós-extração do SA1 Clientes.
-
-Regras aplicadas:
-  1. Strip em colunas texto.
-  2. Renomear para nomes amigáveis.
-  3. Formatar CPF/CNPJ.
-  4. Ordem final de colunas.
-"""
+"""Tratamento pós-extração do SA1 Clientes."""
 import pandas as pd
 
 
 RENOMEAR = {
     "A1_COD":    "CODIGO",
-    "A1_LOJA":   "LOJA",
     "A1_NOME":   "RAZAO SOCIAL",
-    "A1_NREDUZ": "NOME FANTASIA",
     "A1_CGC":    "CNPJ/CPF",
     "A1_MUN":    "MUNICIPIO",
     "A1_EST":    "UF",
@@ -181,14 +136,7 @@ RENOMEAR = {
 }
 
 ORDEM_FINAL = [
-    "CODIGO",
-    "LOJA",
-    "RAZAO SOCIAL",
-    "NOME FANTASIA",
-    "CNPJ/CPF",
-    "MUNICIPIO",
-    "UF",
-    "TELEFONE",
+    "CODIGO", "RAZAO SOCIAL", "CNPJ/CPF", "MUNICIPIO", "UF", "TELEFONE",
 ]
 
 
@@ -196,28 +144,21 @@ def tratar_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
     df.columns = df.columns.str.strip()
 
-    # 1) Strip em colunas texto.
     for col in df.columns:
         if df[col].dtype == object:
             df[col] = df[col].astype(str).str.strip().replace("nan", "")
 
-    # 2) Renomear.
     df = df.rename(columns=RENOMEAR)
-
-    # 3) Ordem final.
     df = df[[c for c in ORDEM_FINAL if c in df.columns]]
     return df
 ```
 
-### Helpers úteis que os outros relatórios já têm
+### Helpers úteis (copie dos outros relatórios quando precisar)
 
-Copie do `ct2010/tratar.py`, `sd3010/tratar.py` ou `sft010/tratar.py` quando precisar:
-
-**Data AAAAMMDD → DD/MM/AAAA**:
+**Data `AAAAMMDD` → `DD/MM/AAAA`**:
 ```python
 def _formatar_data(valor) -> str:
-    if not isinstance(valor, str):
-        return valor
+    if not isinstance(valor, str): return valor
     v = valor.strip()
     if len(v) == 8 and v.isdigit():
         return f"{v[6:8]}/{v[4:6]}/{v[0:4]}"
@@ -227,309 +168,272 @@ def _formatar_data(valor) -> str:
 **Numérico com vírgula**:
 ```python
 def _formatar_numero(x, casas: int) -> str:
-    if pd.isna(x):
-        return ""
-    try:
-        return f"{float(x):.{casas}f}".replace(".", ",")
-    except (TypeError, ValueError):
-        return str(x)
+    if pd.isna(x): return ""
+    try:    return f"{float(x):.{casas}f}".replace(".", ",")
+    except: return str(x)
 ```
 
-**Juntar data + hora**:
-```python
-def _consolidar_data_hora(df, col_data, col_hora, nome_final):
-    if col_data not in df.columns:
-        return df
-    datas = df[col_data].apply(_formatar_data)
-    if col_hora in df.columns:
-        horas = df[col_hora].apply(_formatar_hora)
-        df[nome_final] = (datas.fillna("") + " " + horas.fillna("")).str.strip()
-        df = df.drop(columns=[col_hora])
-    else:
-        df[nome_final] = datas
-    df = df.drop(columns=[col_data])
-    return df
-```
+## Passo 4 — Criar `__init__.py` — a declaração
 
-## Passo 4 — Registrar no `registry.py`
-
-Abre `backend/app/relatorios_prontos/registry.py` e adiciona uma entrada na
-lista `RELATORIOS`:
+**Esse é O arquivo que faz o relatório existir no sistema.** O backend varre
+`app.relatorios_prontos.*` e encontra o objeto `relatorio`.
 
 ```python
-    {
-        "id": "sa1_clientes",
-        "nome": "SA1 — Cadastro de Clientes",
-        "descricao": "Lista todos os clientes ativos com dados cadastrais básicos.",
-        "filtros": "nenhum",
-    },
-```
-
-Posição na lista não importa — o frontend ordena pelo nome.
-
-## Passo 5 — Adicionar o endpoint em `routers/relatorios.py`
-
-Abre `backend/app/routers/relatorios.py`.
-
-**5.1 — Importa as funções novas** (perto dos outros imports do topo):
-
-```python
+"""Registro do SA1 Clientes no sistema."""
+from app.relatorios_prontos.base import RelatorioPronto
 from app.relatorios_prontos.sa1_clientes.extrair import extrair_sa1_clientes
-from app.relatorios_prontos.sa1_clientes.tratar import tratar_dataframe as tratar_sa1_clientes
+from app.relatorios_prontos.sa1_clientes.tratar import tratar_dataframe
+
+
+# Wrapper: aceita **kwargs do despachante central e repassa pros args certos.
+# Pra "nenhum", basta ignorar tudo. Pra "periodo", pega data_inicio/data_fim.
+# Pra "filial_periodo", pega filial + datas.
+def _extrair(**_):
+    return extrair_sa1_clientes()
+
+
+relatorio = RelatorioPronto(
+    id="sa1_clientes",                          # mesmo nome da pasta
+    nome="SA1 — Cadastro de Clientes",          # aparece no menu
+    descricao="Lista todos os clientes ativos com dados cadastrais básicos.",
+    filtros="nenhum",                           # "nenhum" | "periodo" | "filial_periodo"
+    extrair=_extrair,
+    tratar=tratar_dataframe,
+)
 ```
 
-**5.2 — Cria o endpoint**. Se o relatório é `"nenhum"`:
+### Para `filtros="periodo"`:
 
 ```python
-@router.post("/sa1_clientes/extrair")
-def sa1_clientes(request: Request,
-                 db: Session = Depends(get_db),
-                 usuario: Usuario = Depends(get_usuario_atual)) -> StreamingResponse:
-    return executar_e_responder_csv(
-        db=db, request=request, usuario=usuario,
-        relatorio_id="sa1_clientes",
-        nome_arquivo="SA1_Clientes.csv",
-        extrair_fn=lambda: extrair_sa1_clientes(),
-        tratar_fn=tratar_sa1_clientes,
-    )
+def _extrair(data_inicio: str, data_fim: str, **_):
+    return extrair_meu_relatorio(data_inicio, data_fim)
+
+relatorio = RelatorioPronto(
+    id="meu_id",
+    nome="...",
+    descricao="...",
+    filtros="periodo",
+    extrair=_extrair,
+    tratar=tratar_dataframe,
+)
 ```
 
-### Variações do endpoint
+### Para `filtros="filial_periodo"`:
 
-**Com período**:
 ```python
-@router.post("/meu_id/extrair")
-def meu_id(filtros: FiltrosPeriodo, request: Request,
-           db: Session = Depends(get_db),
-           usuario: Usuario = Depends(get_usuario_atual)) -> StreamingResponse:
-    di, df = filtros.para_aaaammdd()
-    return executar_e_responder_csv(
-        db=db, request=request, usuario=usuario,
-        relatorio_id="meu_id",
-        nome_arquivo=f"MeuID_{di}_a_{df}.csv",
-        extrair_fn=lambda: extrair_meu_relatorio(di, df),
-        tratar_fn=tratar_meu_relatorio,
-        parametros_log={"data_inicio": di, "data_fim": df},
-    )
+def _extrair(filial: str, data_inicio: str, data_fim: str, **_):
+    return extrair_meu_relatorio(filial, data_inicio, data_fim)
+
+relatorio = RelatorioPronto(
+    id="meu_id",
+    ...
+    filtros="filial_periodo",
+    extrair=_extrair,
+    tratar=tratar_dataframe,
+)
 ```
 
-**Com filial + período**:
+> **Por que o wrapper `_extrair`?** O despachante central passa TODOS os
+> filtros como `**kwargs`. Se sua função já aceita kwargs, pode usar direto
+> em `extrair=`. O wrapper existe só pra isolar as assinaturas antigas de
+> `extrair.py` que são posicionais.
+
+### Nome de arquivo (opcional)
+
+Por padrão, o CSV baixado se chama:
+- `MEU_ID.csv` (sem filtros)
+- `MEU_ID_AAAAMMDD_a_AAAAMMDD.csv` (período)
+- `MEU_ID_FILIAL_AAAAMMDD_a_AAAAMMDD.csv` (filial + período)
+
+Pra customizar, passa `nome_arquivo_template`:
+
 ```python
-@router.post("/meu_id/extrair")
-def meu_id(filtros: FiltrosFilialPeriodo, request: Request,
-           db: Session = Depends(get_db),
-           usuario: Usuario = Depends(get_usuario_atual)) -> StreamingResponse:
-    di, df = filtros.para_aaaammdd()
-    filial = filtros.filial.strip()
-    return executar_e_responder_csv(
-        db=db, request=request, usuario=usuario,
-        relatorio_id="meu_id",
-        nome_arquivo=f"MeuID_{filial}_{di}_a_{df}.csv",
-        extrair_fn=lambda: extrair_meu_relatorio(filial, di, df),
-        tratar_fn=tratar_meu_relatorio,
-        parametros_log={"filial": filial, "data_inicio": di, "data_fim": df},
-    )
+relatorio = RelatorioPronto(
+    ...,
+    nome_arquivo_template="SA1_Clientes_{data_inicio}_a_{data_fim}.csv",
+)
 ```
 
-### O que o `executar_e_responder_csv` faz por você
+Placeholders disponíveis: `{data_inicio}`, `{data_fim}`, `{filial}` (quando aplicável).
 
-- ✅ Verifica se o usuário tem permissão (403 se não tiver)
-- ✅ Chama `extrair_fn()` e checa se veio vazio (404 "sem registros")
-- ✅ Chama `tratar_fn(df)` se definido
-- ✅ Serializa pra CSV (`;` separador, UTF-8 com BOM, pronto pra Excel)
-- ✅ Devolve `StreamingResponse` com `Content-Disposition: attachment`
-- ✅ Grava log em `logs_acesso` com duração, nº de linhas, parâmetros
-- ✅ Captura qualquer exceção → 500 com mensagem + log de falha
+---
 
-Você não precisa pensar em nada disso.
+## Passo 5 — Reiniciar o backend
 
-## Passo 6 — Ajustes no frontend
+```bash
+sudo systemctl restart extrator-backend
+sudo systemctl restart extrator-scheduler   # se tiver agendamento recorrente
+```
 
-O `RelatorioGenerico.tsx` já atende os 3 tipos de filtros (`nenhum`,
-`periodo`, `filial_periodo`) sem precisar de código novo — ele olha o
-campo `filtros` que vem do `/relatorios` e renderiza o formulário certo.
+E no log você vai ver:
 
-Só tem 2 coisas que valem ajustar no frontend (ambos **opcionais**, o
-relatório funciona sem eles):
+```
+auto-descoberta: 12 relatórios registrados
+```
 
-### 6.1 — Ícone no menu e na sidebar
+Se seu relatório deu erro de importação, aparece no `journalctl -u extrator-backend`
+com stack trace.
 
-Hoje cada card no menu principal tem um ícone (ex: 🧾 pro CT2010, ⚗️ pro
-QPR010). Se você não configurar, seu relatório ganha o ícone padrão
-`FileSpreadsheet` — fica aceitável. Pra customizar:
+---
 
-Abre **`frontend/src/pages/Menu.tsx`**.
+## Passo 6 — Ajustes no frontend (opcionais)
 
-**a)** No topo, junto dos outros imports da `lucide-react`, adiciona o
-nome do ícone que você escolheu:
+### 6.1 — Ícone no menu
 
+Hoje cada card no menu principal tem um ícone (ex: 🧾 pro CT2010). Se você
+não configurar, seu relatório ganha o ícone padrão `FileSpreadsheet`.
+
+Edita `frontend/src/pages/Menu.tsx`:
+
+**a)** Import no topo:
 ```tsx
-import {
-  BarChart3, Beaker, Boxes, FileSpreadsheet, Inbox, Package,
-  Receipt, ScrollText, Sparkles, TerminalSquare, Timer, Truck,
-  Users,   // ← novo — importa do https://lucide.dev/icons
-} from 'lucide-react'
+import { ..., Users } from 'lucide-react'   // Users é um exemplo
 ```
 
-**b)** Mais abaixo, adiciona uma entrada no mapa `ICONES`:
-
+**b)** Entrada no mapa `ICONES`:
 ```tsx
 const ICONES: Record<string, typeof FileSpreadsheet> = {
   ct2010: ScrollText,
-  qpr010: Beaker,
   // ...
-  sa1_clientes: Users,   // ← seu relatório aqui, com o ícone importado acima
+  sa1_clientes: Users,
 }
 ```
 
-> **Dica**: catálogo de ícones em https://lucide.dev/icons. Escolha algo
-> que representa o conteúdo — pessoas (`Users`), dinheiro (`Wallet`,
-> `Receipt`), produção (`Factory`, `Package`), tempo (`Timer`, `Clock`).
-> O estilo é consistente, qualquer ícone combina visualmente.
+Catálogo de ícones: https://lucide.dev/icons.
 
-> O **Sidebar** usa o ícone genérico `ChevronRight` pros relatórios prontos
-> e não precisa ser alterado — o mapa `ICONES` só afeta os cards do menu
-> principal e a tela `/jobs`.
+### 6.2 — Atribuir a uma área (sem código)
 
-### 6.2 — Atribuir o relatório a uma área (sem código)
-
-Toda vez que um relatório novo aparece na listagem, ele cai na seção
-**"Outros"** no menu até que um admin o atribua a uma área (Contábil,
-Fiscal, Produção, etc.). Isso é feito pelo painel, sem mexer em código:
-
-1. Login como admin → menu lateral **Áreas** (ou direto em `/admin/areas`)
-2. Na segunda seção da tela, encontra o relatório recém-criado na coluna
-   "Sem área"
-3. Seleciona a área desejada no dropdown → o relatório some de "Outros"
-   e aparece agrupado no menu
-
-Se a área ainda não existe (ex: um relatório de "Logística" sendo o
-primeiro do grupo), cria ela antes na mesma tela.
+Login como admin → `/admin/areas` → na seção "Atribuições", encontra o
+relatório recém-criado e seleciona a área (Contábil, Fiscal, etc). Se
+não atribuir, ele cai em "Outros" no menu.
 
 ### 6.3 — Build do frontend em produção
 
-Se mexeu no `Menu.tsx` (passo 6.1), precisa rebuildar o frontend pra
-distribuir. Em dev, o `npm run dev` já recarrega sozinho. Em produção:
+Se mexeu no `Menu.tsx`:
 
 ```bash
 cd /opt/extrator-protheus/frontend
 sudo -u extrator npm run build
 ```
 
-O FastAPI serve estaticamente de `frontend/dist/` — não precisa reiniciar
-o backend.
+### 6.4 — Liberar permissão (sem código)
 
-### 6.4 — Permissão de acesso (sem código também)
+Admin vê tudo automaticamente. Usuário comum precisa ter a permissão
+marcada em `/admin/usuarios/:id`.
 
-Admin vê todos os relatórios automaticamente. **Usuário comum** precisa
-ter a permissão liberada individualmente — painel `/admin/usuarios/:id`,
-marca o relatório novo na lista e salva.
+---
 
-## Passo 7 — Testar localmente
+## Testar
 
 Em dev:
 
 ```bash
-# Backend — reinicia pra pegar o endpoint novo
 cd backend
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+uvicorn app.main:app --reload
 ```
 
-Como admin, abre o navegador no `http://localhost:5173/menu`. O card novo
-aparece junto com os outros. Clica → extração roda → CSV baixa.
+Como admin, abre `http://localhost:5173/menu`. O card novo aparece junto
+com os outros.
 
-## Passo 8 — Liberar pros usuários
+---
 
-No painel `/admin/usuarios/:id`, cada usuário não-admin precisa ter o
-relatório marcado nas permissões. **Admin** vê tudo automaticamente.
-
-## Passo 9 — Deploy em produção
+## Deploy em produção
 
 ```bash
-# No PC
+# PC
 git add .
 git commit -m "feat(relatorios): adiciona SA1 Clientes"
 git push
 
-# Na VM
+# VM
 cd /opt/extrator-protheus
 sudo -u extrator git pull
-sudo -u extrator /opt/extrator-protheus/deploy/deploy.sh
+sudo systemctl restart extrator-backend extrator-scheduler
 ```
 
 ---
 
 ## Checklist completo
 
-Pra não esquecer nada:
-
 **Backend** (obrigatório):
-- [ ] `backend/app/relatorios_prontos/<id>/__init__.py` (vazio)
-- [ ] `backend/app/relatorios_prontos/<id>/extrair.py` com função `extrair_<id>`
-- [ ] `backend/app/relatorios_prontos/<id>/tratar.py` com função `tratar_dataframe`
-- [ ] Entrada em `RELATORIOS` no `registry.py`
-- [ ] 2 imports novos em `routers/relatorios.py` (extrair + tratar)
-- [ ] Endpoint `@router.post("/<id>/extrair")` no mesmo arquivo
+- [ ] `backend/app/relatorios_prontos/<id>/extrair.py`
+- [ ] `backend/app/relatorios_prontos/<id>/tratar.py`
+- [ ] `backend/app/relatorios_prontos/<id>/__init__.py` com `relatorio = RelatorioPronto(...)`
+- [ ] `sudo systemctl restart extrator-backend`
 
 **Frontend** (opcional):
-- [ ] Import do ícone novo no topo do `Menu.tsx`
-- [ ] Entrada no mapa `ICONES` do `Menu.tsx`
-- [ ] `npm run build` em produção se mexeu no frontend
+- [ ] Import do ícone no topo do `Menu.tsx` + entrada no `ICONES`
+- [ ] `npm run build` em produção
 
-**Pós-deploy** (pelo painel admin, sem código):
-- [ ] Atribuiu uma área ao relatório em `/admin/areas` (ou deixou em "Outros")
-- [ ] Liberou permissão pros usuários não-admin em `/admin/usuarios/:id`
-
-**Validação**:
-- [ ] Testou localmente e baixou o CSV
-- [ ] `git push` + `deploy.sh` na VM
+**Pós-deploy pelo painel admin** (sem código):
+- [ ] Atribuiu área em `/admin/areas` (ou deixou em "Outros")
+- [ ] Liberou permissão pros usuários em `/admin/usuarios/:id`
 
 ---
 
-## Resumo visual da estrutura
+## Variante: relatório em 1 único arquivo (sem subpasta)
+
+Se o relatório é simples e cabe num arquivo só, você também pode:
 
 ```
-backend/app/
-├── relatorios_prontos/
-│   ├── registry.py            ← adiciona entry aqui
-│   ├── ct2010/                ← modelo rico (período + PROCV + CV3)
-│   ├── sb8_suzano/            ← modelo sem filtros (mais simples)
-│   ├── qpr010/                ← modelo com filial+período
-│   └── sa1_clientes/          ← ← ← SEU NOVO AQUI
-│       ├── __init__.py
-│       ├── extrair.py
-│       └── tratar.py
-└── routers/
-    └── relatorios.py          ← adiciona imports + endpoint aqui
+backend/app/relatorios_prontos/sa1_clientes.py   ← tudo aqui
 ```
+
+Com o conteúdo:
+
+```python
+import pandas as pd
+from app.oracle import get_oracle_connection
+from app.relatorios_prontos.base import RelatorioPronto
+
+
+def _extrair(**_):
+    query = "SELECT A1_COD, A1_NOME FROM SA1010 WHERE D_E_L_E_T_ = ' '"
+    conn = get_oracle_connection()
+    try:
+        return pd.read_sql(query, conn)
+    finally:
+        conn.close()
+
+
+def _tratar(df):
+    return df.rename(columns={"A1_COD": "CODIGO", "A1_NOME": "RAZAO SOCIAL"})
+
+
+relatorio = RelatorioPronto(
+    id="sa1_clientes",
+    nome="SA1 — Cadastro de Clientes",
+    descricao="...",
+    filtros="nenhum",
+    extrair=_extrair,
+    tratar=_tratar,
+)
+```
+
+Use pasta pros relatórios com muita lógica (CT2010 tem `apoio.py` pra
+carregar planilhas). Use arquivo único pros simples.
 
 ---
 
 ## Perguntas frequentes
 
-**Posso usar imports de módulos externos (requests, numpy, etc)?**
-Sim, mas adiciona a dep em `requirements.txt` e roda `pip install -r
-requirements.txt` na VM depois do deploy.
-
-**E se o relatório não precisar de tratamento (CSV cru)?**
-Passa `tratar_fn=None` no `executar_e_responder_csv`. Não precisa criar
-`tratar.py`, mas deixa o arquivo vazio pra manter o padrão.
+**Esqueci de registrar em algum arquivo central e dá 500?**
+Isso não existe mais. O único lugar que o relatório precisa aparecer é no
+`__init__.py` dele próprio. Se o relatório não aparece no menu depois do
+restart, checa o `journalctl -u extrator-backend -n 50` — normalmente é
+erro de sintaxe ou import no seu próprio código.
 
 **Preciso rodar migration do Alembic?**
 Não — relatórios prontos não mexem na estrutura do banco interno.
-Migrations só são necessárias se você mudar modelos SQLAlchemy em
-`app/models/`.
 
-**O usuário consegue ver o relatório imediatamente após o deploy?**
-Só se for admin. Usuários comuns precisam que você libere a permissão
-individualmente em `/admin/usuarios/:id`.
-
-**Posso reutilizar a `apoio.py` do CT2010 (planilhas de PROCV)?**
-Sim — se seu novo relatório precisar enriquecer dados com as mesmas
-planilhas, importa de `app.relatorios_prontos.ct2010.apoio`.
+**Posso reutilizar helpers de outros relatórios (ex: `apoio.py` do CT2010)?**
+Sim, é só importar: `from app.relatorios_prontos.ct2010.apoio import ...`.
 
 **Como vou debugar quando der erro?**
-Logs do backend em tempo real: `sudo journalctl -u extrator-backend -f`.
-Toda falha de extração também cai em `logs_acesso` com `erro_mensagem`
-detalhado — consulta via `/admin/logs` ou `sudo -u postgres psql -d
-extrator` + SELECT.
+Logs em tempo real: `sudo journalctl -u extrator-backend -f`. Toda falha
+de extração também cai em `logs_acesso` com `erro_mensagem` — veja em
+`/admin/logs`.
+
+**O ID no `__init__.py` precisa bater com o nome da pasta?**
+Idealmente sim (ajuda a achar), mas o loader só olha o campo `id` dentro
+do `RelatorioPronto`. Se divergir, não quebra — só fica confuso de achar.
