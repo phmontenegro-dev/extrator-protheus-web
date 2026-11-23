@@ -141,6 +141,11 @@ def disparar_agendamento(
         duracao_estimada_s=eta,
     )
     db.add(job)
+    # Flush explícito: o INSERT em agendamentos_execucoes tem FK pra
+    # jobs_extracao.id. Sem o flush, o SQLAlchemy pode tentar inserir a
+    # execução ANTES do job (porque usamos o id como string crua, sem
+    # relationship()), e o Postgres rejeita com FK violation.
+    db.flush()
 
     # 5) AgendamentoExecucao com params_resolvidos (snapshot do que rodou).
     exec_ = AgendamentoExecucao(
