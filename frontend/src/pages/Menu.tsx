@@ -5,6 +5,7 @@ import {
   Beaker,
   Boxes,
   FileSpreadsheet,
+  Calendar,
   Inbox,
   Package,
   Receipt,
@@ -110,13 +111,22 @@ export default function Menu() {
             Selecione um relatório para configurar os filtros e extrair.
           </p>
         </div>
-        <button
-          onClick={() => navigate('/jobs')}
-          className="flex items-center gap-2 px-3 py-2 rounded-lg border border-border hover:bg-accent text-sm font-medium transition-colors"
-        >
-          <Inbox className="h-4 w-4" />
-          Meus jobs
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => navigate('/jobs')}
+            className="flex items-center gap-2 px-3 py-2 rounded-lg border border-border hover:bg-accent text-sm font-medium transition-colors"
+          >
+            <Inbox className="h-4 w-4" />
+            Meus jobs
+          </button>
+          <button
+            onClick={() => navigate('/agendamentos')}
+            className="flex items-center gap-2 px-3 py-2 rounded-lg border border-border hover:bg-accent text-sm font-medium transition-colors"
+          >
+            <Calendar className="h-4 w-4" />
+            Agendamentos
+          </button>
+        </div>
       </div>
 
       {carregando && (

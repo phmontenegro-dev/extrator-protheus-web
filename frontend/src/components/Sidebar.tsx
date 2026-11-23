@@ -4,6 +4,7 @@ import {
   ChevronRight,
   FileSpreadsheet,
   FolderTree,
+  Calendar,
   Inbox,
   LayoutDashboard,
   LogOut,
@@ -205,6 +206,11 @@ export function Sidebar() {
               to="/jobs"
               label="Meus jobs"
               icon={<Inbox className="h-4 w-4" />}
+            />
+            <ItemNav
+              to="/agendamentos"
+              label="Agendamentos"
+              icon={<Calendar className="h-4 w-4" />}
             />
           </Secao>
 

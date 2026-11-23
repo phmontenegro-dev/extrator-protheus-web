@@ -8,6 +8,9 @@ import Menu from './pages/Menu'
 import NotFound from './pages/NotFound'
 import CodigoSql from './pages/CodigoSql'
 import Jobs from './pages/Jobs'
+import Agendamentos from './pages/Agendamentos'
+import AgendamentoForm from './pages/AgendamentoForm'
+import AgendamentoDetalhe from './pages/AgendamentoDetalhe'
 import RelatorioGenerico from './pages/relatorios/RelatorioGenerico'
 import Admin from './pages/admin/Admin'
 import Usuarios from './pages/admin/Usuarios'
@@ -55,6 +58,10 @@ export default function App() {
           />
           <Route path="/sql" element={<Protegida><CodigoSql /></Protegida>} />
           <Route path="/jobs" element={<Protegida><Jobs /></Protegida>} />
+          <Route path="/agendamentos" element={<Protegida><Agendamentos /></Protegida>} />
+          <Route path="/agendamentos/novo" element={<Protegida><AgendamentoForm /></Protegida>} />
+          <Route path="/agendamentos/:id" element={<Protegida><AgendamentoDetalhe /></Protegida>} />
+          <Route path="/agendamentos/:id/editar" element={<Protegida><AgendamentoForm /></Protegida>} />
           <Route path="/admin" element={<Admin_><Admin /></Admin_>} />
           <Route path="/admin/usuarios" element={<Admin_><Usuarios /></Admin_>} />
           <Route path="/admin/usuarios/:id" element={<Admin_><UsuarioEditar /></Admin_>} />
