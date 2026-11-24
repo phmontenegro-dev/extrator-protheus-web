@@ -22,6 +22,7 @@ def extrair_ct2010(data_inicio: str, data_fim: str) -> pd.DataFrame:
     """data_inicio e data_fim no formato AAAAMMDD"""
     query = """
         SELECT
+            CT2.R_E_C_N_O_ AS CT2_RECNO,
             CT2.CT2_FILIAL, CT2.CT2_DATA, CT2.CT2_LOTE, CT2.CT2_DC,
             CT2.CT2_DEBITO, CT2.CT2_CREDIT, CT2.CT2_VALOR,
             CT2.CT2_HIST, CT2.CT2_CCD, CT2.CT2_CCC, CT2.CT2_DOC,
