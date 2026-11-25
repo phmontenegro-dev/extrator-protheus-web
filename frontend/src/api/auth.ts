@@ -44,3 +44,32 @@ export async function me(): Promise<Usuario | null> {
     return null
   }
 }
+
+// ---- Perfil do próprio usuário (Etapa 17) ----
+
+export type AtualizarPerfilPayload = {
+  nome_completo: string
+  email: string | null
+  senha_atual: string
+}
+
+export async function atualizarPerfil(p: AtualizarPerfilPayload): Promise<Usuario> {
+  const resp = await api.patch<Usuario>('/auth/me', p)
+  return resp.data
+}
+
+export type TrocarSenhaResponse = {
+  ok: boolean
+  sessoes_revogadas: number
+}
+
+export async function trocarSenha(
+  senha_atual: string,
+  senha_nova: string,
+): Promise<TrocarSenhaResponse> {
+  const resp = await api.post<TrocarSenhaResponse>('/auth/me/trocar-senha', {
+    senha_atual,
+    senha_nova,
+  })
+  return resp.data
+}

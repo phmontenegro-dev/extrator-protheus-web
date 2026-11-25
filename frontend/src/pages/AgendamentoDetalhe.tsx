@@ -259,9 +259,9 @@ export default function AgendamentoDetalhe() {
           {ag.preset_datas && (
             <Item rotulo="Período">{PRESETS_LABELS[ag.preset_datas]}</Item>
           )}
-          {ag.filtros_base?.filial && (
+          {Boolean(ag.filtros_base?.filial) && (
             <Item rotulo="Filial">
-              <span className="font-mono">{String(ag.filtros_base.filial)}</span>
+              <span className="font-mono">{String(ag.filtros_base?.filial)}</span>
             </Item>
           )}
           <Item rotulo="Próxima execução">

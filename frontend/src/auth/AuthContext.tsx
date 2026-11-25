@@ -15,6 +15,11 @@ type AuthContextValue = {
   usuario: Usuario | null
   login: (username: string, senha: string) => Promise<void>
   logout: () => Promise<void>
+  /**
+   * Refaz GET /auth/me e atualiza o estado — usado após editar o perfil
+   * próprio pra o header/sidebar pegarem o novo nome.
+   */
+  recarregar: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined)
@@ -50,8 +55,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  const recarregar = async () => {
+    const u = await authApi.me()
+    setUsuario(u)
+  }
+
   return (
-    <AuthContext.Provider value={{ carregando, usuario, login, logout }}>
+    <AuthContext.Provider value={{ carregando, usuario, login, logout, recarregar }}>
       {children}
     </AuthContext.Provider>
   )

@@ -248,7 +248,8 @@ export function Sidebar() {
         {/* Footer: usuário + tema + sair */}
         <div className="border-t border-border p-3 space-y-3">
           <button
-            onClick={() => navigate('/menu')}
+            onClick={() => navigate('/perfil')}
+            title="Meu perfil"
             className="flex w-full items-center gap-3 rounded-md px-2 py-2 text-left hover:bg-accent"
           >
             <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground font-semibold text-xs">
