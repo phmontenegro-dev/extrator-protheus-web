@@ -14,11 +14,11 @@ Livre (TIPOS_OCULTOS em consulta_colunas.py).
 import pandas as pd
 
 from app.oracle import get_oracle_connection
-from app.relatorio_livre.consulta_colunas import nomes_colunas
+from app.utils.colunas_oracle import nomes_colunas_safe
 
 
 def extrair_sb1_produtos() -> pd.DataFrame:
-    colunas = nomes_colunas("SB1010")
+    colunas = nomes_colunas_safe("SB1010")
     if not colunas:
         raise RuntimeError(
             "SB1010 não tem colunas visíveis ao usuário do banco — "

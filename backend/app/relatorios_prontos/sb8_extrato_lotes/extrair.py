@@ -12,11 +12,11 @@ Aqui é a versão genérica.
 import pandas as pd
 
 from app.oracle import get_oracle_connection
-from app.relatorio_livre.consulta_colunas import nomes_colunas
+from app.utils.colunas_oracle import nomes_colunas_safe
 
 
 def extrair_sb8_extrato_lotes() -> pd.DataFrame:
-    colunas = nomes_colunas("SB8010")
+    colunas = nomes_colunas_safe("SB8010")
     if not colunas:
         raise RuntimeError("SB8010 não tem colunas visíveis — verifique privilégios.")
     cols_sql = ", ".join(colunas)

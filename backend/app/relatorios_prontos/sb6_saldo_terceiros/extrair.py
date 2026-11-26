@@ -7,11 +7,11 @@ tratamento do SB1 (ver extrair.py do sb1_produtos pro motivo).
 import pandas as pd
 
 from app.oracle import get_oracle_connection
-from app.relatorio_livre.consulta_colunas import nomes_colunas
+from app.utils.colunas_oracle import nomes_colunas_safe
 
 
 def extrair_sb6_saldo_terceiros() -> pd.DataFrame:
-    colunas = nomes_colunas("SB6010")
+    colunas = nomes_colunas_safe("SB6010")
     if not colunas:
         raise RuntimeError("SB6010 não tem colunas visíveis — verifique privilégios.")
     cols_sql = ", ".join(colunas)
