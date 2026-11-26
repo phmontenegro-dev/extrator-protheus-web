@@ -6,9 +6,60 @@ export type TabelaInfo = {
   campo_data_sugerido: string | null
 }
 
+export type TipoLogico = 'texto' | 'numero' | 'data'
+
+export type ColunaInfo = {
+  nome: string
+  tipo_oracle: string
+  tipo_logico: TipoLogico
+}
+
 export type ColunasResponse = {
   tabela: string
-  colunas: string[]
+  colunas: ColunaInfo[]
+}
+
+// Operadores — precisa casar com o Literal/schema do backend.
+export type Operador =
+  // texto
+  | '=' | '<>' | 'contem' | 'comeca_com' | 'em_lista' | 'is_null' | 'nao_is_null'
+  // numero
+  | '>' | '<' | '>=' | '<=' | 'entre'
+  // data
+  | 'data_igual' | 'data_maior' | 'data_menor' | 'data_entre' | 'ultimos_n_dias'
+
+/** Mesma tabela do backend — mantida aqui pra UI oferecer só o válido. */
+export const OPERADORES_POR_TIPO: Record<TipoLogico, Operador[]> = {
+  texto: ['=', '<>', 'contem', 'comeca_com', 'em_lista', 'is_null', 'nao_is_null'],
+  numero: ['=', '<>', '>', '<', '>=', '<=', 'entre', 'is_null', 'nao_is_null'],
+  data: ['data_igual', 'data_maior', 'data_menor', 'data_entre', 'ultimos_n_dias', 'is_null', 'nao_is_null'],
+}
+
+/** Rótulos em PT-BR pros operadores — exibidos no <select>. */
+export const ROTULO_OPERADOR: Record<Operador, string> = {
+  '=': 'igual a',
+  '<>': 'diferente de',
+  'contem': 'contém',
+  'comeca_com': 'começa com',
+  'em_lista': 'está em (lista)',
+  'is_null': 'está vazio',
+  'nao_is_null': 'não está vazio',
+  '>': 'maior que',
+  '<': 'menor que',
+  '>=': 'maior ou igual a',
+  '<=': 'menor ou igual a',
+  'entre': 'entre',
+  'data_igual': 'na data',
+  'data_maior': 'após',
+  'data_menor': 'antes de',
+  'data_entre': 'entre as datas',
+  'ultimos_n_dias': 'nos últimos N dias',
+}
+
+export type FiltroCampo = {
+  coluna: string
+  operador: Operador
+  valor: string | number | Array<string | number> | null
 }
 
 export type FiltrosLivrePayload = {
@@ -18,6 +69,7 @@ export type FiltrosLivrePayload = {
   data_inicio: string | null
   data_fim: string | null
   max_linhas: number | null
+  filtros_extra: FiltroCampo[]
 }
 
 export async function listarTabelas(): Promise<TabelaInfo[]> {

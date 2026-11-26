@@ -7,10 +7,12 @@ aplicamos defesa em profundidade:
 
   - a tabela é validada contra listar_tabelas() (dicionário do Oracle);
   - o campo_data (se informado) é validado contra listar_colunas(tabela);
-  - as colunas selecionadas também são validadas contra listar_colunas(tabela).
+  - as colunas selecionadas também são validadas contra listar_colunas(tabela);
+  - filtros_extra (Etapa 12) têm nome de coluna validado e operador validado
+    contra o tipo da coluna — ver app/relatorio_livre/filtros.py.
 
 Se algum item vier fora dessas fontes controladas, a extração falha antes
-de tocar o banco. Datas sempre vão como bind variables.
+de tocar o banco. Valores sempre vão como bind variables.
 """
 from typing import List, Optional
 
@@ -18,6 +20,8 @@ import pandas as pd
 
 from app.oracle import get_oracle_connection
 from app.relatorio_livre.consulta_colunas import listar_colunas, listar_tabelas
+from app.relatorio_livre.filtros import montar_where
+from app.schemas.relatorio_livre import FiltroCampo
 
 
 def extrair(
@@ -27,6 +31,7 @@ def extrair(
     data_inicio: Optional[str],
     data_fim: Optional[str],
     max_linhas: Optional[int] = None,
+    filtros_extra: Optional[List[FiltroCampo]] = None,
 ) -> pd.DataFrame:
     """
     Extração crua, sem tratamento adicional.
@@ -37,6 +42,7 @@ def extrair(
         campo_data: coluna usada no BETWEEN. None = sem filtro de data.
         data_inicio, data_fim: AAAAMMDD. Obrigatórias se campo_data informado.
         max_linhas: se informado, aplica ROWNUM <= max_linhas.
+        filtros_extra: lista de FiltroCampo (Etapa 12 — filtros dinâmicos).
     """
     tabela = tabela.upper()
 
@@ -49,21 +55,32 @@ def extrair(
     if not colunas:
         raise ValueError("Nenhuma coluna selecionada para a extração.")
 
-    colunas_validas = set(listar_colunas(tabela))
-    invalidas = [c for c in colunas if c not in colunas_validas]
+    # Colunas: dict {nome: tipo_logico} pra usar no builder de filtros, e set
+    # dos nomes pra validações rápidas.
+    colunas_meta = {c["nome"]: c["tipo_logico"] for c in listar_colunas(tabela)}
+    nomes_validos = set(colunas_meta.keys())
+
+    invalidas = [c for c in colunas if c not in nomes_validos]
     if invalidas:
         raise ValueError(f"Colunas inválidas para {tabela}: {invalidas}")
 
     where_partes: list[str] = []
     params: dict = {}
     if campo_data:
-        if campo_data not in colunas_validas:
+        if campo_data not in nomes_validos:
             raise ValueError(f"Campo de data '{campo_data}' não existe em {tabela}.")
         if not data_inicio or not data_fim:
             raise ValueError("Datas obrigatórias quando o campo de data é informado.")
         where_partes.append(f"{campo_data} BETWEEN :data_inicio AND :data_fim")
         params["data_inicio"] = data_inicio
         params["data_fim"] = data_fim
+
+    # Filtros dinâmicos (Etapa 12)
+    if filtros_extra:
+        frag, binds = montar_where(filtros_extra, colunas_meta)
+        if frag:
+            where_partes.append(frag)
+            params.update(binds)
 
     if max_linhas is not None:
         if not isinstance(max_linhas, int) or max_linhas <= 0:

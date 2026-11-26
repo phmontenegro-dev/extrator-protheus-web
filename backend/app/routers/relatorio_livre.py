@@ -117,6 +117,8 @@ def extrair_endpoint(
         "data_inicio": di,
         "data_fim": df,
         "max_linhas": filtros.max_linhas,
+        # Snapshot de filtros_extra pro log — fica fácil de auditar
+        "filtros_extra": [f.model_dump() for f in filtros.filtros_extra],
     }
 
     return executar_e_responder_csv(
@@ -130,6 +132,7 @@ def extrair_endpoint(
             data_inicio=di,
             data_fim=df,
             max_linhas=filtros.max_linhas,
+            filtros_extra=filtros.filtros_extra,
         ),
         tratar_fn=None,  # Livre não aplica tratamento — extração crua
         parametros_log=parametros,

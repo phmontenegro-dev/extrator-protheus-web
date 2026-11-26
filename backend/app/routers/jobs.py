@@ -250,6 +250,8 @@ def extrair_livre_async(
         "data_inicio": di,
         "data_fim": df,
         "max_linhas": filtros.max_linhas,
+        # Serializa pra dict pra persistir em jsonb — o runner reidrata.
+        "filtros_extra": [f.model_dump() for f in filtros.filtros_extra],
     }
     runner = runner_relatorio_livre(filtros_dict, nome_arq)
 

@@ -91,8 +91,18 @@ def runner_relatorio_pronto(
 def runner_relatorio_livre(filtros: dict, nome_arquivo: str):
     """
     filtros precisa ter: tabela, colunas (list), campo_data (opcional),
-    data_inicio (opcional), data_fim (opcional), max_linhas (opcional).
+    data_inicio (opcional), data_fim (opcional), max_linhas (opcional),
+    filtros_extra (opcional — list de dicts com coluna/operador/valor).
     """
+    # Reidrata filtros_extra se vierem como lista de dicts (ex: agendamentos).
+    from app.schemas.relatorio_livre import FiltroCampo
+    raw_extra = filtros.get("filtros_extra") or []
+    filtros_extra: list[FiltroCampo] = []
+    for item in raw_extra:
+        if isinstance(item, FiltroCampo):
+            filtros_extra.append(item)
+        else:
+            filtros_extra.append(FiltroCampo(**item))
 
     def _run(ctx: JobContext) -> None:
         ctx.avancar(STATUS_CONSULTANDO)
@@ -103,6 +113,7 @@ def runner_relatorio_livre(filtros: dict, nome_arquivo: str):
             data_inicio=filtros.get("data_inicio"),
             data_fim=filtros.get("data_fim"),
             max_linhas=filtros.get("max_linhas"),
+            filtros_extra=filtros_extra,
         )
 
         if df is None or df.empty:
