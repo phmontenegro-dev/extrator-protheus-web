@@ -1,19 +1,24 @@
 """
 Extração do SB6 — Saldo de Terceiros por Produto (Logística).
 
-Dump de SB6010 — produtos em poder de/em posse de terceiros (remessas,
-industrialização por encomenda etc). Todas as colunas, não deletados.
+Dump de SB6010 (não deletados) com todas as colunas CSV-safe — mesmo
+tratamento do SB1 (ver extrair.py do sb1_produtos pro motivo).
 """
 import pandas as pd
 
 from app.oracle import get_oracle_connection
+from app.relatorio_livre.consulta_colunas import nomes_colunas
 
 
 def extrair_sb6_saldo_terceiros() -> pd.DataFrame:
-    query = """
-        SELECT s.*
-        FROM SB6010 s
-        WHERE s.D_E_L_E_T_ = ' '
+    colunas = nomes_colunas("SB6010")
+    if not colunas:
+        raise RuntimeError("SB6010 não tem colunas visíveis — verifique privilégios.")
+    cols_sql = ", ".join(colunas)
+    query = f"""
+        SELECT {cols_sql}
+        FROM SB6010
+        WHERE D_E_L_E_T_ = ' '
     """
     conn = get_oracle_connection()
     try:

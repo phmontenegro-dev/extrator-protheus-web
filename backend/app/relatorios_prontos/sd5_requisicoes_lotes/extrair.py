@@ -2,19 +2,25 @@
 Extração do SD5 — Requisições de Lotes (Logística).
 
 Dump de SD5010 — movimentos de lote com OP associada (D5_OP não vazio),
-não deletados. Todas as colunas.
+não deletados. Colunas CSV-safe só — mesmo tratamento do SB1 (ver
+extrair.py do sb1_produtos pro motivo).
 """
 import pandas as pd
 
 from app.oracle import get_oracle_connection
+from app.relatorio_livre.consulta_colunas import nomes_colunas
 
 
 def extrair_sd5_requisicoes_lotes() -> pd.DataFrame:
-    query = """
-        SELECT s.*
-        FROM SD5010 s
-        WHERE s.D5_OP <> ' '
-          AND s.D_E_L_E_T_ = ' '
+    colunas = nomes_colunas("SD5010")
+    if not colunas:
+        raise RuntimeError("SD5010 não tem colunas visíveis — verifique privilégios.")
+    cols_sql = ", ".join(colunas)
+    query = f"""
+        SELECT {cols_sql}
+        FROM SD5010
+        WHERE D5_OP <> ' '
+          AND D_E_L_E_T_ = ' '
     """
     conn = get_oracle_connection()
     try:
