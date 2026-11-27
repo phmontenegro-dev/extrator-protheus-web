@@ -142,6 +142,26 @@ class JobContext:
     def avancar(self, status: str) -> None:
         _atualizar_status(self.job_id, status=status)
 
+    def heartbeat(self) -> None:
+        """
+        Atualiza heartbeat_em imediatamente — chame de dentro de fases
+        pesadas do runner que possam segurar o GIL por mais tempo que o
+        timeout do watchdog (ex: pandas.to_csv de um DataFrame gigante,
+        groupby em cima de milhões de linhas, concat grande).
+
+        A thread de progresso em background já bate heartbeat a cada 2s,
+        mas sob GIL contention extrema (pandas em C puro durante minutos)
+        ela pode perder ticks suficientes pra o watchdog marcar o job
+        como zumbi por engano. Este método é a garantia explícita — custo
+        é 1 UPDATE curto, ~alguns ms.
+
+        Idempotente: chamar a mais não quebra nada; chamar de menos leva
+        a falsos positivos do watchdog.
+        """
+        _atualizar_status(
+            self.job_id, heartbeat_em=datetime.now(timezone.utc),
+        )
+
     def finalizar_sucesso(
         self,
         caminho_csv: str,

@@ -8,8 +8,15 @@ Cada runner é uma função `(ctx: JobContext) -> None` que:
 
 Reusa o máximo possível do código síncrono já existente — a extração e
 o tratamento continuam sendo as funções extrair_X / tratar_X.
+
+Heartbeat: durante fases pandas pesadas (groupby, concat, to_csv de
+milhões de linhas) o GIL pode ficar segurado por mais de 2 minutos,
+estourando o watchdog. Pra evitar, chamamos `ctx.heartbeat()`
+explicitamente entre chunks do to_csv, e passamos o ctx pra funções
+`tratar` que aceitam na assinatura (ver `_chamar_tratar`).
 """
 import csv as _csv
+import inspect
 import io
 import logging
 import os
@@ -26,6 +33,64 @@ from app.relatorio_livre.extrair import extrair as extrair_livre
 from app.relatorios_prontos.registry import buscar_pronto
 
 log = logging.getLogger(__name__)
+
+
+# -----------------------------------------------------------------------------
+# Helpers compartilhados
+# -----------------------------------------------------------------------------
+
+# Chunksize do CSV. Buffers maiores que ~200k em DataFrame largo ficam
+# caros em RAM; buffers menores que ~5k multiplicam a overhead por chunk.
+# 20k é um bom meio-termo.
+_CHUNK_CSV = 20_000
+
+
+def _chamar_tratar(tratar_fn, df, ctx):
+    """
+    Chama a função de tratamento, passando `ctx` apenas se a assinatura
+    aceitar — mantém compat com tratares antigos que só recebem `df`.
+    """
+    try:
+        sig = inspect.signature(tratar_fn)
+    except (TypeError, ValueError):
+        return tratar_fn(df)
+    if "ctx" in sig.parameters:
+        return tratar_fn(df, ctx=ctx)
+    return tratar_fn(df)
+
+
+def _escrever_csv_com_heartbeat(df, caminho: str, ctx) -> None:
+    """
+    Escreve o DataFrame em chunks, batendo heartbeat entre cada bloco.
+    Isso impede que um `df.to_csv(..., chunksize=20k)` monolítico segure
+    o GIL por >2min em DataFrames gigantes e seja marcado como zumbi.
+
+    Mantém o BOM UTF-8 esperado pelo Excel (utf-8-sig equivalente).
+    """
+    n = len(df)
+    primeira = True
+    # Abre em binário pra escrever o BOM manualmente antes do CSV UTF-8.
+    with open(caminho, "wb") as fbin:
+        fbin.write(b"\xef\xbb\xbf")  # BOM UTF-8
+    # Reabre em texto pra append (mais simples do que mesclar writer + BOM).
+    with open(caminho, "a", encoding="utf-8", newline="") as f:
+        for ini in range(0, max(n, 1), _CHUNK_CSV):
+            fim = min(ini + _CHUNK_CSV, n)
+            sub = df.iloc[ini:fim]
+            sub.to_csv(
+                f, index=False, sep=";",
+                header=primeira, encoding="utf-8",
+            )
+            primeira = False
+            # Heartbeat explícito entre chunks — barato, ~1 UPDATE.
+            try:
+                ctx.heartbeat()
+            except Exception:
+                # Heartbeat é best-effort. Nunca derruba a escrita do CSV.
+                log.exception("heartbeat falhou durante to_csv do job %s", ctx.job_id)
+            # Se o DataFrame era vazio, sai no 1º giro.
+            if n == 0:
+                break
 
 
 # -----------------------------------------------------------------------------
@@ -62,16 +127,14 @@ def runner_relatorio_pronto(
 
         ctx.avancar(STATUS_TRATANDO)
         if rel.tratar is not None:
-            df = rel.tratar(df)
+            df = _chamar_tratar(rel.tratar, df, ctx)
 
         ctx.avancar(STATUS_ESCREVENDO)
         caminho = caminho_do_csv(ctx.job_id)
-        # chunksize=20000: pandas serializa em blocos, liberando buffers de
-        # string entre eles. Reduz pico de RAM em ~30-40% em relação a
-        # dump único, especialmente em DataFrames largos com muita coluna texto.
-        df.to_csv(
-            caminho, index=False, sep=";", encoding="utf-8-sig", chunksize=20000
-        )
+        # Escreve em chunks com heartbeat entre cada bloco — evita que
+        # to_csv monolítico de DataFrame gigante (ex: CT2010 do ano
+        # inteiro) segure GIL por >2min e seja marcado como zumbi.
+        _escrever_csv_com_heartbeat(df, caminho, ctx)
         tamanho = os.path.getsize(caminho)
 
         ctx.finalizar_sucesso(
@@ -123,9 +186,7 @@ def runner_relatorio_livre(filtros: dict, nome_arquivo: str):
         # Livre não aplica tratamento (extração crua).
         ctx.avancar(STATUS_ESCREVENDO)
         caminho = caminho_do_csv(ctx.job_id)
-        df.to_csv(
-            caminho, index=False, sep=";", encoding="utf-8-sig", chunksize=20000
-        )
+        _escrever_csv_com_heartbeat(df, caminho, ctx)
         tamanho = os.path.getsize(caminho)
 
         ctx.finalizar_sucesso(

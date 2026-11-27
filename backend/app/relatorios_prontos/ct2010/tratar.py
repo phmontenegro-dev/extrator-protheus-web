@@ -177,7 +177,24 @@ def enriquecer_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def tratar_dataframe(df: pd.DataFrame) -> pd.DataFrame:
+def tratar_dataframe(df: pd.DataFrame, ctx=None) -> pd.DataFrame:
+    """
+    Tratamento completo do CT2010.
+
+    `ctx` é opcional pra manter compat com usos síncronos (fora de job):
+    quando presente, batemos `ctx.heartbeat()` entre as fases pesadas
+    (groupby de consolidação, iterrows de partida dobrada, drop_duplicates
+    final). Isso impede que o watchdog marque o job como zumbi em
+    datasets grandes (ex: ano inteiro de lançamentos).
+    """
+    def _bater():
+        """Helper local: bate heartbeat se ctx foi passado, senão no-op."""
+        if ctx is not None:
+            try:
+                ctx.heartbeat()
+            except Exception:
+                pass  # best-effort, nunca derruba o tratamento
+
     df = df.copy()
     df.columns = df.columns.str.strip()
 
@@ -187,17 +204,20 @@ def tratar_dataframe(df: pd.DataFrame) -> pd.DataFrame:
                 "CLI_FOR", "LOJA", "NOME_CLIFOR", "RAZAO_SOCIAL"]:
         if col in df.columns:
             df[col] = df[col].astype(str).str.strip()
+    _bater()
 
     # Consolida continuações do histórico (CT2_DC='4') nas linhas pai.
     # Precisa rodar antes de TUDO: lotes excluídos não afetam, e precisamos
     # das continuações agregadas antes do split de partida dobrada.
     df = _consolidar_continuacoes_hist(df)
+    _bater()
 
     # Consolida linhas duplicadas pelo JOIN com CV3 quando um lançamento tem
     # múltiplas NFs. Concatena as colunas de NF em uma única célula por
     # lançamento (ex: "123, 456, 789" no NUMERO_NF). Precisa rodar ANTES do
     # split de partida dobrada — senão agruparia débito e crédito juntos.
     df = _consolidar_nfs(df)
+    _bater()
 
     # Exclusão de lotes
     df = df[~df["CT2_LOTE"].isin(LOTES_EXCLUIDOS)].copy()
@@ -205,12 +225,13 @@ def tratar_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     # Tradução 1/2/3 -> DEBITO/CREDITO/PARTIDA DOBRADA
     df["CT2_DC"] = df["CT2_DC"].astype(str).str.strip().map(MAPA_DC).fillna(df["CT2_DC"])
 
-    # Partida dobrada vira duas linhas
+    # Partida dobrada vira duas linhas. O iterrows é O(n) python puro e pode
+    # ser pesado em bases grandes — batemos heartbeat a cada 10k linhas.
     linhas_novas = []
     partida_dobrada = df[df["CT2_DC"] == "PARTIDA DOBRADA"]
     demais = df[df["CT2_DC"] != "PARTIDA DOBRADA"]
 
-    for _, linha in partida_dobrada.iterrows():
+    for i, (_, linha) in enumerate(partida_dobrada.iterrows()):
         linha_debito = linha.copy()
         linha_debito["CT2_CREDIT"] = ""
         linha_debito["CT2_CCC"] = ""
@@ -223,7 +244,11 @@ def tratar_dataframe(df: pd.DataFrame) -> pd.DataFrame:
         linha_credito["CT2_DC"] = "CREDITO"
         linhas_novas.append(linha_credito)
 
+        if (i + 1) % 10_000 == 0:
+            _bater()
+
     df_final = pd.concat([demais, pd.DataFrame(linhas_novas)], ignore_index=True)
+    _bater()
 
     # Sinal negativo nos créditos
     df_final["CT2_VALOR"] = pd.to_numeric(df_final["CT2_VALOR"], errors="coerce")
@@ -244,6 +269,7 @@ def tratar_dataframe(df: pd.DataFrame) -> pd.DataFrame:
 
     df_final = enriquecer_dataframe(df_final)
     df_final = df_final[[c for c in COLUNAS_FINAIS if c in df_final.columns]]
+    _bater()
 
     # Remove duplicatas 100% idênticas. Isso costuma acontecer quando o JOIN
     # com CV3 retorna múltiplas linhas para o mesmo lançamento (ex: vários
@@ -251,5 +277,6 @@ def tratar_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     # comparamos TODAS as colunas finais, linhas legítimas com NFs diferentes
     # não são afetadas — só as que são cópias exatas.
     df_final = df_final.drop_duplicates().reset_index(drop=True)
+    _bater()
 
     return df_final

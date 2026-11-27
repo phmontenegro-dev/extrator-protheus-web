@@ -67,6 +67,18 @@ class Settings(BaseSettings):
     # (http://192.168.3.128 ou https://extrator.technocoat.local).
     api_base_externa: str = "http://localhost:8000"
 
+    # ----- Watchdog de jobs zumbis -----
+    # Tempo máximo (em segundos) que um job pode ficar sem atualizar
+    # heartbeat_em antes de ser marcado como zumbi. Default 120s é
+    # confortável depois que os runners passaram a chamar ctx.heartbeat()
+    # explicitamente entre fases pesadas (groupby/concat/to_csv). Se algum
+    # relatório novo não instrumentar o tratamento e começar a estourar o
+    # timeout, suba este valor como paliativo — mas o fix certo é
+    # instrumentar o tratar.py do relatório.
+    watchdog_heartbeat_timeout_s: int = 120
+    # Mesmo princípio pra jobs que nunca bateram heartbeat (queue backlog).
+    watchdog_nunca_bateu_timeout_s: int = 300
+
     @property
     def cors_origins_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]

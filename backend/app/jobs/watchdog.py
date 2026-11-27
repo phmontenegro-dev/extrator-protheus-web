@@ -22,19 +22,18 @@ from datetime import datetime, timedelta, timezone
 
 from sqlalchemy.orm import Session
 
+from app.config import get_settings
 from app.models.job import STATUS_ATIVOS, STATUS_ERRO, JobExtracao
 
 log = logging.getLogger(__name__)
 
-# Se não há heartbeat há mais que isso, trata como zumbi.
-# 2 minutos > 2s de tick da thread de progresso + 60s de ciclo do watchdog,
-# com folga pra micro-contenções de IO/CPU que podem atrasar o heartbeat
-# em até ~10s legitimamente.
-HEARTBEAT_TIMEOUT_S = 120
-
-# Pra jobs que nunca receberam heartbeat (status mudou mas a thread de progresso
-# nem começou), damos um prazo maior — pode ser queue backlog do executor.
-NUNCA_BATEU_TIMEOUT_S = 300
+# Timeouts lidos do settings (.env) — defaults no app/config.py.
+# `HEARTBEAT_TIMEOUT_S`: tempo máximo sem heartbeat antes de marcar zumbi.
+# `NUNCA_BATEU_TIMEOUT_S`: prazo mais longo pra jobs que ainda não bateram
+# heartbeat algum (queue backlog, worker lento pra iniciar).
+# Relatórios pesados (CT2010 ano inteiro) podem exigir timeout maior se o
+# pandas estiver segurando GIL durante to_csv() e a thread de progresso
+# perder ticks.
 
 
 def marcar_zumbis_agora(db: Session) -> int:
@@ -42,9 +41,13 @@ def marcar_zumbis_agora(db: Session) -> int:
     Marca como erro todos os jobs ativos considerados zumbis no momento.
     Retorna a quantidade marcada.
     """
+    settings = get_settings()
+    heartbeat_timeout_s = settings.watchdog_heartbeat_timeout_s
+    nunca_bateu_timeout_s = settings.watchdog_nunca_bateu_timeout_s
+
     agora = datetime.now(timezone.utc)
-    limite_hb = agora - timedelta(seconds=HEARTBEAT_TIMEOUT_S)
-    limite_sem_hb = agora - timedelta(seconds=NUNCA_BATEU_TIMEOUT_S)
+    limite_hb = agora - timedelta(seconds=heartbeat_timeout_s)
+    limite_sem_hb = agora - timedelta(seconds=nunca_bateu_timeout_s)
 
     # Candidatos: ativos COM heartbeat velho, OU ativos sem heartbeat mas antigos.
     candidatos = (
@@ -79,13 +82,13 @@ def marcar_zumbis_agora(db: Session) -> int:
             idle = _idle(j.heartbeat_em)
             motivo = (
                 f"Worker interrompido inesperadamente — sem sinal de vida há "
-                f"{idle}s (limite: {HEARTBEAT_TIMEOUT_S}s)."
+                f"{idle}s (limite: {heartbeat_timeout_s}s)."
             )
         else:
             idle = _idle(j.criado_em)
             motivo = (
                 f"Job nunca começou a reportar progresso em {idle}s "
-                f"(limite: {NUNCA_BATEU_TIMEOUT_S}s) — provável crash antes "
+                f"(limite: {nunca_bateu_timeout_s}s) — provável crash antes "
                 f"do primeiro tick."
             )
         j.status = STATUS_ERRO
