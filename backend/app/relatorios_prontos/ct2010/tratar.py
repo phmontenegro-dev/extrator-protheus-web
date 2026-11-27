@@ -130,68 +130,98 @@ def _consolidar_continuacoes_hist(df: pd.DataFrame) -> pd.DataFrame:
     import numpy as np
     t0 = time.monotonic()
 
-    df = df.copy()
+    # Normaliza CT2_DC in-place (não copia o DataFrame todo).
     df["CT2_DC"] = df["CT2_DC"].astype(str).str.strip()
     log.warning(
-        "[CT2010 DIAG] cont_hist.copy+dc em %.1fs (%d linhas)",
+        "[CT2010 DIAG] cont_hist.dc_strip em %.1fs (%d linhas)",
         time.monotonic() - t0, len(df),
     )
 
-    # Sort via np.lexsort sobre códigos categoricos (int) em vez de
-    # df.sort_values em 4 colunas string. Em ~1M linhas isso cai de
-    # vários minutos pra <2s. A ordem é a mesma (lexicográfica nas 4
-    # colunas na mesma ordem de prioridade).
+    # Extrai apenas as colunas que o loop usa como ARRAYS numpy. Nunca
+    # reordenamos o DataFrame inteiro (seria O(linhas × colunas) de cópia
+    # pandas em object dtype — minutos em 886k × 25). Trabalhamos só com
+    # as 5 colunas em arrays, achamos a ordem, aplicamos o resultado de
+    # volta via índice.
     t = time.monotonic()
-    f_codes = pd.Categorical(df["CT2_FILIAL"]).codes
-    l_codes = pd.Categorical(df["CT2_LOTE"]).codes
-    d_codes = pd.Categorical(df["CT2_DOC"]).codes
-    ln_codes = pd.Categorical(df["CT2_LINHA"]).codes
-    # lexsort: a ÚLTIMA chave tem prioridade MAIOR, então inverte a
-    # ordem pra manter o mesmo comportamento do antigo
-    # sort_values([FILIAL, LOTE, DOC, LINHA]).
+    filiais_orig = df["CT2_FILIAL"].to_numpy()
+    lotes_orig = df["CT2_LOTE"].to_numpy()
+    docs_orig = df["CT2_DOC"].to_numpy()
+    linhas_orig = df["CT2_LINHA"].to_numpy()
+    hists_orig = df["CT2_HIST"].astype(str).to_numpy()
+    dc_orig = df["CT2_DC"].to_numpy()
+    log.warning(
+        "[CT2010 DIAG] cont_hist.to_numpy em %.1fs",
+        time.monotonic() - t,
+    )
+
+    # Códigos categoricos pra comparar como int (lexsort em string é lento).
+    t = time.monotonic()
+    f_codes = pd.Categorical(filiais_orig).codes
+    l_codes = pd.Categorical(lotes_orig).codes
+    d_codes = pd.Categorical(docs_orig).codes
+    ln_codes = pd.Categorical(linhas_orig).codes
+    log.warning(
+        "[CT2010 DIAG] cont_hist.cat_codes em %.1fs",
+        time.monotonic() - t,
+    )
+
+    # lexsort: a ÚLTIMA chave tem prioridade MAIOR, então inverte a ordem
+    # pra manter o mesmo comportamento do antigo sort_values.
+    t = time.monotonic()
     order = np.lexsort((ln_codes, d_codes, l_codes, f_codes))
-    df = df.iloc[order].reset_index(drop=True)
     log.warning(
         "[CT2010 DIAG] cont_hist.lexsort em %.1fs",
         time.monotonic() - t,
     )
 
+    # Reindexa só os arrays (não o DataFrame).
     t = time.monotonic()
-    eh_cont = (df["CT2_DC"] == "4").to_numpy()
-
-    # Usamos listas em vez de .at/.iat dentro do loop por performance:
-    # em datasets grandes (centenas de milhares de linhas) isso é 50x+ rápido.
-    filiais = df["CT2_FILIAL"].astype(str).tolist()
-    lotes = df["CT2_LOTE"].astype(str).tolist()
-    docs = df["CT2_DOC"].astype(str).tolist()
-    hists = df["CT2_HIST"].astype(str).tolist()
+    filiais_s = filiais_orig[order]
+    lotes_s = lotes_orig[order]
+    docs_s = docs_orig[order]
+    hists_s = hists_orig[order].copy()  # .copy() porque vamos mutar
+    dc_s = dc_orig[order]
+    eh_cont_s = (dc_s == "4")
     log.warning(
-        "[CT2010 DIAG] cont_hist.tolist em %.1fs",
+        "[CT2010 DIAG] cont_hist.reindex_arrays em %.1fs",
         time.monotonic() - t,
     )
 
+    # Loop em ordem — âncora é o índice SORTED. Como estamos iterando em
+    # ordem lexicográfica (FILIAL, LOTE, DOC, LINHA), a âncora é sempre
+    # a última linha "não-continuação" vista no mesmo grupo (FILIAL, LOTE,
+    # DOC) — exatamente o que queremos.
     t = time.monotonic()
-    ancora_por_grupo: dict[tuple[str, str, str], int] = {}
-    for i in range(len(df)):
-        chave = (filiais[i], lotes[i], docs[i])
-        if eh_cont[i]:
+    n = len(df)
+    ancora_por_grupo: dict[tuple, int] = {}
+    for i in range(n):
+        chave = (filiais_s[i], lotes_s[i], docs_s[i])
+        if eh_cont_s[i]:
             ancora = ancora_por_grupo.get(chave)
             if ancora is not None:
-                # Concatena sem separador — o Protheus corta exatamente no
-                # 40º char e a continuação começa no 41º, sem espaço.
-                hists[ancora] = (hists[ancora] or "") + (hists[i] or "")
+                # Protheus corta no 40º char; continuação começa no 41º sem espaço.
+                hists_s[ancora] = (hists_s[ancora] or "") + (hists_s[i] or "")
         else:
             ancora_por_grupo[chave] = i
     log.warning(
         "[CT2010 DIAG] cont_hist.loop em %.1fs (%d linhas)",
-        time.monotonic() - t, len(df),
+        time.monotonic() - t, n,
     )
 
+    # Reescreve CT2_HIST no DataFrame original (sem reordenar o df).
+    # hists_s está na ordem SORTED; precisamos mapear de volta pra ordem
+    # original usando `order` como tabela de permutação: hists_final[order[i]] = hists_s[i].
     t = time.monotonic()
-    df["CT2_HIST"] = hists
-    df = df[~eh_cont].reset_index(drop=True)
+    hists_final = np.empty(n, dtype=object)
+    hists_final[order] = hists_s
+    df["CT2_HIST"] = hists_final
+
+    # eh_cont no DataFrame original: desfaz o order também.
+    eh_cont_orig = np.zeros(n, dtype=bool)
+    eh_cont_orig[order] = eh_cont_s
+    df = df.loc[~eh_cont_orig].reset_index(drop=True)
     log.warning(
-        "[CT2010 DIAG] cont_hist.filter em %.1fs (%d linhas finais)",
+        "[CT2010 DIAG] cont_hist.writeback em %.1fs (%d linhas finais)",
         time.monotonic() - t, len(df),
     )
     return df
