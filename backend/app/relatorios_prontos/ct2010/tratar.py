@@ -208,20 +208,37 @@ def _consolidar_continuacoes_hist(df: pd.DataFrame) -> pd.DataFrame:
         time.monotonic() - t, n,
     )
 
-    # Reescreve CT2_HIST no DataFrame original (sem reordenar o df).
-    # hists_s está na ordem SORTED; precisamos mapear de volta pra ordem
-    # original usando `order` como tabela de permutação: hists_final[order[i]] = hists_s[i].
+    # Reescreve CT2_HIST (em arrays, sem tocar o DataFrame ainda).
     t = time.monotonic()
     hists_final = np.empty(n, dtype=object)
     hists_final[order] = hists_s
-    df["CT2_HIST"] = hists_final
 
-    # eh_cont no DataFrame original: desfaz o order também.
+    # eh_cont no índice original (pra filtrar as continuações no final).
     eh_cont_orig = np.zeros(n, dtype=bool)
     eh_cont_orig[order] = eh_cont_s
-    df = df.loc[~eh_cont_orig].reset_index(drop=True)
     log.warning(
-        "[CT2010 DIAG] cont_hist.writeback em %.1fs (%d linhas finais)",
+        "[CT2010 DIAG] cont_hist.wb1_arrays em %.1fs",
+        time.monotonic() - t,
+    )
+
+    # Reconstrói o DataFrame via dict de numpy arrays filtrados em vez de
+    # df.loc[mask] + reset_index. O caminho do pandas (BlockManager) copia
+    # 25 colunas object célula por célula pra criar um sub-dataframe — em
+    # 886k linhas isso leva vários minutos. Esse approach direto demora
+    # ~1s por coluna × 25 colunas = segundos.
+    t = time.monotonic()
+    indices_manter = np.where(~eh_cont_orig)[0]
+    novo = {}
+    for col in df.columns:
+        if col == "CT2_HIST":
+            novo[col] = hists_final[indices_manter]
+        else:
+            # .values devolve o numpy array interno, sem cópia. Fancy index
+            # numpy é vetorizado em C, super rápido.
+            novo[col] = df[col].values[indices_manter]
+    df = pd.DataFrame(novo)
+    log.warning(
+        "[CT2010 DIAG] cont_hist.wb2_rebuild em %.1fs (%d linhas finais)",
         time.monotonic() - t, len(df),
     )
     return df
