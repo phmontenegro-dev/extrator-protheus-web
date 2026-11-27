@@ -127,13 +127,36 @@ def _consolidar_continuacoes_hist(df: pd.DataFrame) -> pd.DataFrame:
     if df.empty or "CT2_DC" not in df.columns:
         return df
 
+    import numpy as np
+    t0 = time.monotonic()
+
     df = df.copy()
     df["CT2_DC"] = df["CT2_DC"].astype(str).str.strip()
-    df = df.sort_values(
-        ["CT2_FILIAL", "CT2_LOTE", "CT2_DOC", "CT2_LINHA"],
-        kind="stable",
-    ).reset_index(drop=True)
+    log.warning(
+        "[CT2010 DIAG] cont_hist.copy+dc em %.1fs (%d linhas)",
+        time.monotonic() - t0, len(df),
+    )
 
+    # Sort via np.lexsort sobre códigos categoricos (int) em vez de
+    # df.sort_values em 4 colunas string. Em ~1M linhas isso cai de
+    # vários minutos pra <2s. A ordem é a mesma (lexicográfica nas 4
+    # colunas na mesma ordem de prioridade).
+    t = time.monotonic()
+    f_codes = pd.Categorical(df["CT2_FILIAL"]).codes
+    l_codes = pd.Categorical(df["CT2_LOTE"]).codes
+    d_codes = pd.Categorical(df["CT2_DOC"]).codes
+    ln_codes = pd.Categorical(df["CT2_LINHA"]).codes
+    # lexsort: a ÚLTIMA chave tem prioridade MAIOR, então inverte a
+    # ordem pra manter o mesmo comportamento do antigo
+    # sort_values([FILIAL, LOTE, DOC, LINHA]).
+    order = np.lexsort((ln_codes, d_codes, l_codes, f_codes))
+    df = df.iloc[order].reset_index(drop=True)
+    log.warning(
+        "[CT2010 DIAG] cont_hist.lexsort em %.1fs",
+        time.monotonic() - t,
+    )
+
+    t = time.monotonic()
     eh_cont = (df["CT2_DC"] == "4").to_numpy()
 
     # Usamos listas em vez de .at/.iat dentro do loop por performance:
@@ -142,7 +165,12 @@ def _consolidar_continuacoes_hist(df: pd.DataFrame) -> pd.DataFrame:
     lotes = df["CT2_LOTE"].astype(str).tolist()
     docs = df["CT2_DOC"].astype(str).tolist()
     hists = df["CT2_HIST"].astype(str).tolist()
+    log.warning(
+        "[CT2010 DIAG] cont_hist.tolist em %.1fs",
+        time.monotonic() - t,
+    )
 
+    t = time.monotonic()
     ancora_por_grupo: dict[tuple[str, str, str], int] = {}
     for i in range(len(df)):
         chave = (filiais[i], lotes[i], docs[i])
@@ -154,9 +182,18 @@ def _consolidar_continuacoes_hist(df: pd.DataFrame) -> pd.DataFrame:
                 hists[ancora] = (hists[ancora] or "") + (hists[i] or "")
         else:
             ancora_por_grupo[chave] = i
+    log.warning(
+        "[CT2010 DIAG] cont_hist.loop em %.1fs (%d linhas)",
+        time.monotonic() - t, len(df),
+    )
 
+    t = time.monotonic()
     df["CT2_HIST"] = hists
     df = df[~eh_cont].reset_index(drop=True)
+    log.warning(
+        "[CT2010 DIAG] cont_hist.filter em %.1fs (%d linhas finais)",
+        time.monotonic() - t, len(df),
+    )
     return df
 
 
