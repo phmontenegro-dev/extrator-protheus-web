@@ -13,9 +13,14 @@ Joins:
 Tudo em LEFT JOIN para NÃO perder lançamentos sem NF (financeiros, ajustes,
 provisões). Esses saem no CSV com as colunas de NF em branco.
 """
+import logging
+import time
+
 import pandas as pd
 
 from app.oracle import get_oracle_connection
+
+log = logging.getLogger(__name__)
 
 
 # Tamanho do batch de fetch. 5000 linhas por `fetchmany` dá um bom
@@ -116,31 +121,68 @@ def extrair_ct2010(data_inicio: str, data_fim: str, ctx=None) -> pd.DataFrame:
             except Exception:
                 pass
 
+    t_conn = time.monotonic()
     conn = get_oracle_connection()
+    log.warning("[CT2010 DIAG] conexão aberta em %.1fs", time.monotonic() - t_conn)
     try:
+        t_exec = time.monotonic()
         cur = conn.cursor()
+        # Sugere pro oracledb buscar mais linhas por round-trip, reduzindo
+        # viagens de rede. Oracledb default é 100, aqui subimos pra 5k.
+        try:
+            cur.arraysize = _FETCH_BATCH
+            cur.prefetchrows = _FETCH_BATCH + 1
+        except Exception:
+            pass
         cur.execute(query, {"data_inicio": data_inicio, "data_fim": data_fim})
         colunas = [d[0] for d in cur.description] if cur.description else []
+        log.warning(
+            "[CT2010 DIAG] execute() voltou em %.1fs — cursor aberto, %d colunas",
+            time.monotonic() - t_exec, len(colunas),
+        )
 
         # Primeiro heartbeat: Oracle já pelo menos abriu o cursor.
         _bater()
 
         batches: list[list[tuple]] = []
+        batch_num = 0
+        total_linhas = 0
+        t_total = time.monotonic()
         while True:
+            t_batch = time.monotonic()
             lote = cur.fetchmany(_FETCH_BATCH)
+            dt = time.monotonic() - t_batch
             if not lote:
+                log.warning(
+                    "[CT2010 DIAG] fim do cursor após %d batches / %d linhas / %.1fs totais",
+                    batch_num, total_linhas, time.monotonic() - t_total,
+                )
                 break
+            batch_num += 1
+            total_linhas += len(lote)
+            # Loga todos os batches lentos (>5s) e um a cada 10 pra ter traça.
+            if dt > 5.0 or batch_num % 10 == 0:
+                log.warning(
+                    "[CT2010 DIAG] batch #%d: %d linhas em %.2fs (acumulado: %d linhas / %.1fs)",
+                    batch_num, len(lote), dt, total_linhas,
+                    time.monotonic() - t_total,
+                )
             batches.append(lote)
             _bater()
 
         # Monta o DataFrame de uma só vez — bem mais barato que concat
         # de vários pequenos. Lista de tuples já vem no formato nativo.
+        t_df = time.monotonic()
         if batches:
             # Achata lista de lotes em uma só sequência de linhas.
             linhas = [row for lote in batches for row in lote]
             df = pd.DataFrame(linhas, columns=colunas)
         else:
             df = pd.DataFrame(columns=colunas)
+        log.warning(
+            "[CT2010 DIAG] DataFrame montado em %.1fs (%d linhas)",
+            time.monotonic() - t_df, len(df),
+        )
     finally:
         try:
             conn.close()
