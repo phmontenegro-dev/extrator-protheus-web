@@ -20,6 +20,7 @@ import inspect
 import io
 import logging
 import os
+import time
 from datetime import datetime
 
 from app.jobs.executor import JobContext, caminho_do_csv
@@ -94,6 +95,8 @@ def _escrever_csv_com_heartbeat(df, caminho: str, ctx) -> None:
     """
     n = len(df)
     primeira = True
+    t0 = time.monotonic()
+    chunk_num = 0
     # Abre em binário pra escrever o BOM manualmente antes do CSV UTF-8.
     with open(caminho, "wb") as fbin:
         fbin.write(b"\xef\xbb\xbf")  # BOM UTF-8
@@ -102,11 +105,22 @@ def _escrever_csv_com_heartbeat(df, caminho: str, ctx) -> None:
         for ini in range(0, max(n, 1), _CHUNK_CSV):
             fim = min(ini + _CHUNK_CSV, n)
             sub = df.iloc[ini:fim]
+            tc = time.monotonic()
             sub.to_csv(
                 f, index=False, sep=";",
                 header=primeira, encoding="utf-8",
             )
+            dt = time.monotonic() - tc
             primeira = False
+            chunk_num += 1
+            # Loga chunks lentos (>5s) e um a cada 10 pra ter traça.
+            if dt > 5.0 or chunk_num % 10 == 0:
+                log.warning(
+                    "[CSV DIAG job=%s] chunk #%d: %d linhas em %.2fs "
+                    "(acumulado: %d/%d / %.1fs)",
+                    ctx.job_id[:8], chunk_num, len(sub), dt,
+                    fim, n, time.monotonic() - t0,
+                )
             # Heartbeat explícito entre chunks — barato, ~1 UPDATE.
             try:
                 ctx.heartbeat()
@@ -116,6 +130,10 @@ def _escrever_csv_com_heartbeat(df, caminho: str, ctx) -> None:
             # Se o DataFrame era vazio, sai no 1º giro.
             if n == 0:
                 break
+    log.warning(
+        "[CSV DIAG job=%s] FIM: %d chunks, %d linhas, %.1fs totais",
+        ctx.job_id[:8], chunk_num, n, time.monotonic() - t0,
+    )
 
 
 # -----------------------------------------------------------------------------
