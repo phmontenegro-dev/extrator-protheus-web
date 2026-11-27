@@ -71,27 +71,27 @@ OpsNoPeriodo AS (
       AND COALESCE(D.DataInicio, D.DataFim) <= P.df
 )
 SELECT
-    O.C2_FILIAL        AS O_Filial,
-    O.C2_OP            AS O_OP,
-    O.C2_PRODUTO       AS O_Produto,
-    O.C2_ROTEIRO       AS O_Roteiro,
-    O.C2_XRECURS       AS O_Recurso,
-    O.C2_XCLIENT       AS O_Cliente,
-    O.C2_XLOJA         AS O_LojaCliente,
-    O.C2_DATPRI        AS O_DataPrevistaRaw,
-    O.C2_QUANT         AS O_QuantidadePrevista,
-    H.H6_OPERAC        AS H_Operacao,
-    H.H6_OPERADO       AS H_Operador,
-    H.H6_RECURSO       AS H_RecursoApontado,
-    H.H6_PRODUTO       AS H_Produto,
-    H.H6_QTDPROD       AS H_Quantidade,
-    H.H6_LOTECTL       AS H_LoteProduzido,
-    H.H6_XLOTELI       AS H_LoteConsumido,
-    H.R_E_C_N_O_       AS H_Recno,
-    H.H6_DATAINI       AS H_DataIniRaw,
-    H.H6_HORAINI       AS H_HoraIniRaw,
-    H.H6_DATAFIN       AS H_DataFinRaw,
-    H.H6_HORAFIN       AS H_HoraFinRaw
+    O.C2_FILIAL        AS "O_Filial",
+    O.C2_OP            AS "O_OP",
+    O.C2_PRODUTO       AS "O_Produto",
+    O.C2_ROTEIRO       AS "O_Roteiro",
+    O.C2_XRECURS       AS "O_Recurso",
+    O.C2_XCLIENT       AS "O_Cliente",
+    O.C2_XLOJA         AS "O_LojaCliente",
+    O.C2_DATPRI        AS "O_DataPrevistaRaw",
+    O.C2_QUANT         AS "O_QuantidadePrevista",
+    H.H6_OPERAC        AS "H_Operacao",
+    H.H6_OPERADO       AS "H_Operador",
+    H.H6_RECURSO       AS "H_RecursoApontado",
+    H.H6_PRODUTO       AS "H_Produto",
+    H.H6_QTDPROD       AS "H_Quantidade",
+    H.H6_LOTECTL       AS "H_LoteProduzido",
+    H.H6_XLOTELI       AS "H_LoteConsumido",
+    H.R_E_C_N_O_       AS "H_Recno",
+    H.H6_DATAINI       AS "H_DataIniRaw",
+    H.H6_HORAINI       AS "H_HoraIniRaw",
+    H.H6_DATAFIN       AS "H_DataFinRaw",
+    H.H6_HORAFIN       AS "H_HoraFinRaw"
 FROM SC2010 O
 JOIN SH6010 H
     ON H.H6_FILIAL = O.C2_FILIAL
@@ -126,15 +126,15 @@ DatasPorOP AS (
     GROUP BY H.H6_FILIAL, H.H6_OP
 )
 SELECT
-    O.C2_FILIAL  AS Filial,
-    O.C2_OP      AS OP,
-    O.C2_PRODUTO AS Produto,
-    O.C2_ROTEIRO AS Roteiro,
-    O.C2_XRECURS AS Recurso,
-    O.C2_XCLIENT AS Cliente,
-    O.C2_XLOJA   AS LojaCliente,
-    O.C2_DATPRI  AS DataPrevistaRaw,
-    O.C2_QUANT   AS QuantidadePrevista
+    O.C2_FILIAL  AS "Filial",
+    O.C2_OP      AS "OP",
+    O.C2_PRODUTO AS "Produto",
+    O.C2_ROTEIRO AS "Roteiro",
+    O.C2_XRECURS AS "Recurso",
+    O.C2_XCLIENT AS "Cliente",
+    O.C2_XLOJA   AS "LojaCliente",
+    O.C2_DATPRI  AS "DataPrevistaRaw",
+    O.C2_QUANT   AS "QuantidadePrevista"
 FROM SC2010 O
 CROSS JOIN Parametros P
 LEFT JOIN DatasPorOP D
@@ -147,11 +147,11 @@ WHERE O.D_E_L_E_T_ = ' '
 
 # Query 3: SB1010 inteira (pequena, ~25k linhas).
 _SQL_PRODUTOS = """
-SELECT TRIM(B1_FILIAL) AS Filial, B1_COD AS Codigo,
-       TRIM(B1_UM) AS UM, RTRIM(B1_DESC) AS Descricao,
-       B1_XLARG AS Largura, B1_XCOMP AS Comprimento,
-       NVL(B1_XGRAM1, 0) + NVL(B1_XGRAM2, 0) + NVL(B1_XGRAM3, 0) AS Gramatura,
-       R_E_C_N_O_ AS Recno
+SELECT TRIM(B1_FILIAL) AS "Filial", B1_COD AS "Codigo",
+       TRIM(B1_UM) AS "UM", RTRIM(B1_DESC) AS "Descricao",
+       B1_XLARG AS "Largura", B1_XCOMP AS "Comprimento",
+       NVL(B1_XGRAM1, 0) + NVL(B1_XGRAM2, 0) + NVL(B1_XGRAM3, 0) AS "Gramatura",
+       R_E_C_N_O_ AS "Recno"
 FROM SB1010
 WHERE D_E_L_E_T_ = ' '
 """
@@ -181,8 +181,8 @@ OpsNoPeriodo AS (
     WHERE COALESCE(D.DataFim, D.DataInicio) >= P.di
       AND COALESCE(D.DataInicio, D.DataFim) <= P.df
 )
-SELECT D.D4_FILIAL AS Filial, D.D4_OP AS OP,
-       D.D4_COD AS Codigo, D.D4_QTDEORI AS Quantidade
+SELECT D.D4_FILIAL AS "Filial", D.D4_OP AS "OP",
+       D.D4_COD AS "Codigo", D.D4_QTDEORI AS "Quantidade"
 FROM SD4010 D
 WHERE D.D_E_L_E_T_ = ' '
   AND EXISTS (
@@ -195,10 +195,10 @@ WHERE D.D_E_L_E_T_ = ' '
 # Semântica original: filtra pelo período das janelas de produção calculadas,
 # mas aqui puxamos todas e filtramos em Python (bem menor que apontamentos).
 _SQL_PARADAS = """
-SELECT TRIM(H.H6_FILIAL) AS Filial, H.H6_RECURSO AS Recurso,
-       H.H6_PRODUTO AS Produto,
-       H.H6_DATAINI AS DataIniRaw, H.H6_HORAINI AS HoraIniRaw,
-       H.H6_DATAFIN AS DataFinRaw, H.H6_HORAFIN AS HoraFinRaw
+SELECT TRIM(H.H6_FILIAL) AS "Filial", H.H6_RECURSO AS "Recurso",
+       H.H6_PRODUTO AS "Produto",
+       H.H6_DATAINI AS "DataIniRaw", H.H6_HORAINI AS "HoraIniRaw",
+       H.H6_DATAFIN AS "DataFinRaw", H.H6_HORAFIN AS "HoraFinRaw"
 FROM SH6010 H
 WHERE H.D_E_L_E_T_ = ' '
   AND TRIM(H.H6_OP) IS NULL
@@ -207,21 +207,21 @@ WHERE H.D_E_L_E_T_ = ' '
 
 # Lookups: tabelas pequenas, puxar inteiras.
 _SQL_SG2 = """
-SELECT TRIM(G2_FILIAL) AS Filial, G2_PRODUTO AS Produto,
-       G2_CODIGO AS Roteiro, G2_OPERAC AS Operacao,
-       G2_DESCRI AS Descricao, R_E_C_N_O_ AS Recno
+SELECT TRIM(G2_FILIAL) AS "Filial", G2_PRODUTO AS "Produto",
+       G2_CODIGO AS "Roteiro", G2_OPERAC AS "Operacao",
+       G2_DESCRI AS "Descricao", R_E_C_N_O_ AS "Recno"
 FROM SG2010 WHERE D_E_L_E_T_ = ' '
 """
 
 _SQL_SH1 = """
-SELECT TRIM(H1_FILIAL) AS Filial, H1_CODIGO AS Codigo,
-       H1_DESCRI AS Descricao, R_E_C_N_O_ AS Recno
+SELECT TRIM(H1_FILIAL) AS "Filial", H1_CODIGO AS "Codigo",
+       H1_DESCRI AS "Descricao", R_E_C_N_O_ AS "Recno"
 FROM SH1010 WHERE D_E_L_E_T_ = ' '
 """
 
 _SQL_SA1 = """
-SELECT TRIM(A1_FILIAL) AS Filial, A1_COD AS Codigo, A1_LOJA AS Loja,
-       A1_NOME AS Nome, R_E_C_N_O_ AS Recno
+SELECT TRIM(A1_FILIAL) AS "Filial", A1_COD AS "Codigo", A1_LOJA AS "Loja",
+       A1_NOME AS "Nome", R_E_C_N_O_ AS "Recno"
 FROM SA1010 WHERE D_E_L_E_T_ = ' '
 """
 
