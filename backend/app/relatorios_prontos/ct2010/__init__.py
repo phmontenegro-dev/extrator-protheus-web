@@ -11,8 +11,11 @@ from app.relatorios_prontos.ct2010.extrair import extrair_ct2010
 from app.relatorios_prontos.ct2010.tratar import tratar_dataframe
 
 
-def _extrair(data_inicio: str, data_fim: str, **_):
-    return extrair_ct2010(data_inicio, data_fim)
+def _extrair(data_inicio: str, data_fim: str, ctx=None, **_):
+    # `ctx` chega do runner quando a extração roda dentro de um job
+    # assíncrono — permite ao extrator bater heartbeat entre batches.
+    # Fora de job (chamada síncrona antiga), vira None e não quebra nada.
+    return extrair_ct2010(data_inicio, data_fim, ctx=ctx)
 
 
 relatorio = RelatorioPronto(

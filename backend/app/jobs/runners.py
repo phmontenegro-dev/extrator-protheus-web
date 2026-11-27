@@ -59,6 +59,31 @@ def _chamar_tratar(tratar_fn, df, ctx):
     return tratar_fn(df)
 
 
+def _chamar_extrair(extrair_fn, filtros, ctx):
+    """
+    Chama a função de extração, passando `ctx` apenas se a assinatura
+    aceitar. Mesmo padrão do `_chamar_tratar`: extratores antigos que
+    só recebem `**filtros` seguem funcionando.
+    """
+    try:
+        sig = inspect.signature(extrair_fn)
+    except (TypeError, ValueError):
+        return extrair_fn(**filtros)
+    if "ctx" in sig.parameters:
+        return extrair_fn(ctx=ctx, **filtros)
+    # Se tem **kwargs e aceita qualquer extra, passa ctx também — permite
+    # que extratores pequenos usem `**_` como catch-all e ainda recebam ctx
+    # via introspecção dentro do próprio corpo (ex.: `_extrair(**_)` do
+    # CT2010 que repassa pra `extrair_ct2010(..., ctx=_.get("ctx"))`).
+    has_var_kw = any(
+        p.kind is inspect.Parameter.VAR_KEYWORD
+        for p in sig.parameters.values()
+    )
+    if has_var_kw:
+        return extrair_fn(ctx=ctx, **filtros)
+    return extrair_fn(**filtros)
+
+
 def _escrever_csv_com_heartbeat(df, caminho: str, ctx) -> None:
     """
     Escreve o DataFrame em chunks, batendo heartbeat entre cada bloco.
@@ -119,7 +144,7 @@ def runner_relatorio_pronto(
 
     def _run(ctx: JobContext) -> None:
         ctx.avancar(STATUS_CONSULTANDO)
-        df = rel.extrair(**filtros)
+        df = _chamar_extrair(rel.extrair, filtros, ctx)
 
         if df is None or df.empty:
             ctx.finalizar_erro("Nenhum registro encontrado para os filtros informados.")

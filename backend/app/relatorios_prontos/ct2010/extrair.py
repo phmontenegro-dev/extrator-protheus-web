@@ -18,8 +18,27 @@ import pandas as pd
 from app.oracle import get_oracle_connection
 
 
-def extrair_ct2010(data_inicio: str, data_fim: str) -> pd.DataFrame:
-    """data_inicio e data_fim no formato AAAAMMDD"""
+# Tamanho do batch de fetch. 5000 linhas por `fetchmany` dá um bom
+# equilíbrio: cada batch volta em segundos (mantém o heartbeat vivo) e
+# o overhead de chamada python→driver é diluído o suficiente pra não
+# dominar o tempo total.
+_FETCH_BATCH = 5_000
+
+
+def extrair_ct2010(data_inicio: str, data_fim: str, ctx=None) -> pd.DataFrame:
+    """
+    data_inicio e data_fim no formato AAAAMMDD.
+
+    `ctx` é opcional pra manter compat com usos síncronos: quando passado
+    (vindo do runner de job), chamamos `ctx.heartbeat()` entre cada batch
+    do `fetchmany`. Em bases grandes (CT2010 do ano inteiro) o Oracle pode
+    demorar minutos só pra consolidar os JOINs e começar a devolver linhas,
+    e o `pd.read_sql()` monolítico esconde esse tempo numa única chamada
+    bloqueante — o watchdog marca zumbi mesmo com o worker vivo.
+
+    Com fetchmany manual: o cursor abre, o Oracle começa a streamar, e
+    batemos heartbeat entre cada 5k linhas vindas.
+    """
     query = """
         SELECT
             CT2.R_E_C_N_O_ AS CT2_RECNO,
@@ -89,11 +108,46 @@ def extrair_ct2010(data_inicio: str, data_fim: str) -> pd.DataFrame:
         WHERE CT2.CT2_DATA BETWEEN :data_inicio AND :data_fim
           AND CT2.D_E_L_E_T_ = ' '
     """
+    def _bater():
+        """Helper local: heartbeat se ctx foi passado, senão no-op."""
+        if ctx is not None:
+            try:
+                ctx.heartbeat()
+            except Exception:
+                pass
+
     conn = get_oracle_connection()
     try:
-        df = pd.read_sql(query, conn, params={"data_inicio": data_inicio, "data_fim": data_fim})
+        cur = conn.cursor()
+        cur.execute(query, {"data_inicio": data_inicio, "data_fim": data_fim})
+        colunas = [d[0] for d in cur.description] if cur.description else []
+
+        # Primeiro heartbeat: Oracle já pelo menos abriu o cursor.
+        _bater()
+
+        batches: list[list[tuple]] = []
+        while True:
+            lote = cur.fetchmany(_FETCH_BATCH)
+            if not lote:
+                break
+            batches.append(lote)
+            _bater()
+
+        # Monta o DataFrame de uma só vez — bem mais barato que concat
+        # de vários pequenos. Lista de tuples já vem no formato nativo.
+        if batches:
+            # Achata lista de lotes em uma só sequência de linhas.
+            linhas = [row for lote in batches for row in lote]
+            df = pd.DataFrame(linhas, columns=colunas)
+        else:
+            df = pd.DataFrame(columns=colunas)
     finally:
-        conn.close()
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+    _bater()
 
     for col in ["CT2_FILIAL", "CT2_LOTE", "NUMERO_NF", "SERIE_NF", "CLI_FOR", "LOJA"]:
         if col in df.columns:
