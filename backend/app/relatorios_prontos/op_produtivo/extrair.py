@@ -1,32 +1,26 @@
 """
 Extração — Produtivo por OP (Produção).
 
-Query fiel à versão do Pedro. Monta um mapa denormalizado por Ordem de
-Produção a partir de:
-  - SC2010 (ordens de produção)
-  - SH6010 (apontamentos de produção e paradas de máquina)
-  - SD4010 (empenhos / consumo)
-  - SB1010 (cadastro de produto — unidade, gramatura, dimensões)
-  - SG2010 (operações do roteiro)
-  - SH1010 (recursos)
-  - SA1010 (clientes)
+Query fiel à versão do Pedro na SEMÂNTICA (mesmas colunas, mesmo resultado),
+mas reescrita na estrutura pra eliminar o gargalo de performance identificado
+via EXPLAIN PLAN: os 5 OUTER APPLYs do SELECT final + 1 dentro de Empenhos
+somavam ~99% do custo da query (177M de cost, 6min pra 13k linhas) porque
+o Oracle não consegue fazer HASH JOIN em `OUTER APPLY ... ORDER BY ... FETCH
+FIRST 1 ROW ONLY` correlacionado — vira lateral view com BUFFER SORT por row.
 
-A única mudança em relação ao SQL fornecido pelo Pedro é a CTE
-`Parametros`, que ali tinha as datas hardcoded (`DATE '2026-11-19'`) e
-aqui recebe bind variables `:data_inicio` e `:data_fim` convertidas
-via TO_DATE a partir do formato AAAAMMDD (padrão de datas do sistema).
+Fix: cada OUTER APPLY virou um CTE pré-ranqueado via `ROW_NUMBER() OVER
+PARTITION BY ... ORDER BY ...` + LEFT JOIN no SELECT final onde `rn = 1`.
+Semântica preservada (mesma preferência de filial-específica sobre genérica,
+mesmo critério de desempate por R_E_C_N_O_ desc).
 
-Como o SELECT já formata hora/data, valores em TN e strings de tempo
-HHH:MM, não tem `tratar.py` — o DataFrame vai direto pro CSV.
+Recebe `data_inicio` e `data_fim` em AAAAMMDD; convertidos a DATE no CTE
+`Parametros`.
 """
 import pandas as pd
 
 from app.oracle import get_oracle_connection
 
 
-# SQL mantido LITERAL ao fornecido pelo Pedro — mudanças aqui devem
-# preservar os aliases e a lógica dos JOINs/OUTER APPLYs, pois consumidores
-# à jusante (planilhas, dashboards) dependem dos nomes das colunas.
 _SQL = """
 WITH Parametros AS (
     SELECT TO_DATE(:data_inicio, 'YYYYMMDD') AS DataInicial,
@@ -268,29 +262,147 @@ Indicadores AS (
     FROM OrdensFiltradas O
     LEFT JOIN ParadasPorOP PM ON PM.Filial = O.Filial AND PM.OP = O.OP
 ),
-Empenhos AS (
+
+-- ========================================================================
+-- CTEs pré-ranqueados (substituem os OUTER APPLYs do SELECT final).
+-- Cada um resolve 1 lookup via ROW_NUMBER() OVER PARTITION BY, mesma
+-- preferência de filial do OUTER APPLY original (filial da OP > genérico).
+-- ========================================================================
+
+-- Resolve o Produto final (OUTER APPLY P do original).
+-- Chave de busca = ProdutoApontado (se existir) senão O.Produto.
+ProdutoFinalRank AS (
+    SELECT O.Filial AS FilialOP, O.OP,
+           P.Codigo AS Codigo, P.UM, P.Descricao,
+           P.Largura, P.Comprimento, P.Gramatura,
+           ROW_NUMBER() OVER (
+               PARTITION BY O.Filial, O.OP
+               ORDER BY CASE WHEN P.Filial = TRIM(O.Filial) THEN 0 ELSE 1 END,
+                        P.Recno DESC
+           ) AS rn
+    FROM Indicadores O
+    JOIN Produtos P
+      ON P.Codigo = CASE WHEN TRIM(O.ProdutoApontado) IS NOT NULL
+                         THEN O.ProdutoApontado ELSE O.Produto END
+     AND (P.Filial = TRIM(O.Filial) OR P.Filial IS NULL)
+),
+ProdutoFinal AS (
+    SELECT * FROM ProdutoFinalRank WHERE rn = 1
+),
+
+-- Resolve a descrição da OPERAÇÃO em SG2010 (OUTER APPLY G do original).
+-- Depende do Produto final (precisa do Codigo).
+NomeOperacaoRank AS (
+    SELECT O.Filial AS FilialOP, O.OP,
+           G.G2_DESCRI,
+           ROW_NUMBER() OVER (
+               PARTITION BY O.Filial, O.OP
+               ORDER BY CASE WHEN TRIM(G.G2_FILIAL) = TRIM(O.Filial) THEN 0 ELSE 1 END,
+                        G.R_E_C_N_O_ DESC
+           ) AS rn
+    FROM Indicadores O
+    JOIN ProdutoFinal PF ON PF.FilialOP = O.Filial AND PF.OP = O.OP
+    JOIN SG2010 G
+      ON G.D_E_L_E_T_ = ' '
+     AND G.G2_PRODUTO = PF.Codigo
+     AND G.G2_CODIGO = O.Roteiro
+     AND G.G2_OPERAC = O.Operacao
+     AND (TRIM(G.G2_FILIAL) = TRIM(O.Filial) OR TRIM(G.G2_FILIAL) IS NULL)
+),
+NomeOperacao AS (
+    SELECT * FROM NomeOperacaoRank WHERE rn = 1
+),
+
+-- Resolve descrição de SH1010 do RECURSO (OUTER APPLY R do original).
+RecursoDescRank AS (
+    SELECT O.Filial AS FilialOP, O.OP,
+           H1.H1_DESCRI,
+           ROW_NUMBER() OVER (
+               PARTITION BY O.Filial, O.OP
+               ORDER BY CASE WHEN TRIM(H1.H1_FILIAL) = TRIM(O.Filial) THEN 0 ELSE 1 END,
+                        H1.R_E_C_N_O_ DESC
+           ) AS rn
+    FROM Indicadores O
+    JOIN SH1010 H1
+      ON H1.D_E_L_E_T_ = ' '
+     AND H1.H1_CODIGO = O.Recurso
+     AND TRIM(O.Recurso) IS NOT NULL
+     AND (TRIM(H1.H1_FILIAL) = TRIM(O.Filial) OR TRIM(H1.H1_FILIAL) IS NULL)
+),
+RecursoDesc AS (
+    SELECT * FROM RecursoDescRank WHERE rn = 1
+),
+
+-- Resolve descrição de SH1010 do RECURSO APONTADO (OUTER APPLY RA do original).
+RecursoApontadoDescRank AS (
+    SELECT O.Filial AS FilialOP, O.OP,
+           H1.H1_DESCRI,
+           ROW_NUMBER() OVER (
+               PARTITION BY O.Filial, O.OP
+               ORDER BY CASE WHEN TRIM(H1.H1_FILIAL) = TRIM(O.Filial) THEN 0 ELSE 1 END,
+                        H1.R_E_C_N_O_ DESC
+           ) AS rn
+    FROM Indicadores O
+    JOIN SH1010 H1
+      ON H1.D_E_L_E_T_ = ' '
+     AND H1.H1_CODIGO = O.RecursoApontado
+     AND TRIM(O.RecursoApontado) IS NOT NULL
+     AND (TRIM(H1.H1_FILIAL) = TRIM(O.Filial) OR TRIM(H1.H1_FILIAL) IS NULL)
+),
+RecursoApontadoDesc AS (
+    SELECT * FROM RecursoApontadoDescRank WHERE rn = 1
+),
+
+-- Resolve nome do CLIENTE em SA1010 (OUTER APPLY C do original).
+ClienteNomeRank AS (
+    SELECT O.Filial AS FilialOP, O.OP,
+           C.A1_NOME,
+           ROW_NUMBER() OVER (
+               PARTITION BY O.Filial, O.OP
+               ORDER BY CASE WHEN TRIM(C.A1_FILIAL) = TRIM(O.Filial) THEN 0 ELSE 1 END,
+                        C.R_E_C_N_O_ DESC
+           ) AS rn
+    FROM Indicadores O
+    JOIN SA1010 C
+      ON C.D_E_L_E_T_ = ' '
+     AND C.A1_COD = O.Cliente
+     AND C.A1_LOJA = O.LojaCliente
+     AND TRIM(O.Cliente) IS NOT NULL
+     AND (TRIM(C.A1_FILIAL) = TRIM(O.Filial) OR TRIM(C.A1_FILIAL) IS NULL)
+),
+ClienteNome AS (
+    SELECT * FROM ClienteNomeRank WHERE rn = 1
+),
+
+-- Empenhos: antes usava OUTER APPLY pra Produtos; agora LEFT JOIN + rank.
+EmpenhosComProdutoRank AS (
     SELECT D.D4_FILIAL AS Filial, D.D4_OP AS OP, RTRIM(D.D4_COD) AS Codigo,
-           P.Descricao, P.UM,
-           CASE P.UM
-               WHEN 'KG' THEN D.D4_QTDEORI / 1000
-               WHEN 'FL' THEN P.Gramatura * P.Largura * P.Comprimento
-                              * D.D4_QTDEORI / 1000000000000
-               WHEN 'TN' THEN D.D4_QTDEORI
-           END AS PesoTN
+           D.D4_QTDEORI, D.R_E_C_N_O_ AS DRecno,
+           P.UM, P.Descricao, P.Gramatura, P.Largura, P.Comprimento,
+           ROW_NUMBER() OVER (
+               PARTITION BY D.R_E_C_N_O_
+               ORDER BY CASE WHEN P.Filial = TRIM(D.D4_FILIAL) THEN 0 ELSE 1 END,
+                        NVL(P.Recno, 0) DESC
+           ) AS rn
     FROM SD4010 D
-    OUTER APPLY (
-        SELECT P.*
-        FROM Produtos P
-        WHERE P.Codigo = D.D4_COD
-          AND (P.Filial = TRIM(D.D4_FILIAL) OR P.Filial IS NULL)
-        ORDER BY CASE WHEN P.Filial = TRIM(D.D4_FILIAL) THEN 0 ELSE 1 END, P.Recno DESC
-        FETCH FIRST 1 ROW ONLY
-    ) P
+    LEFT JOIN Produtos P
+      ON P.Codigo = D.D4_COD
+     AND (P.Filial = TRIM(D.D4_FILIAL) OR P.Filial IS NULL)
     WHERE D.D_E_L_E_T_ = ' '
       AND EXISTS (
           SELECT 1 FROM OrdensNoPeriodo O
           WHERE O.Filial = D.D4_FILIAL AND O.OP = D.D4_OP
       )
+),
+Empenhos AS (
+    SELECT Filial, OP, Codigo, Descricao, UM,
+           CASE UM
+               WHEN 'KG' THEN D4_QTDEORI / 1000
+               WHEN 'FL' THEN Gramatura * Largura * Comprimento * D4_QTDEORI / 1000000000000
+               WHEN 'TN' THEN D4_QTDEORI
+           END AS PesoTN
+    FROM EmpenhosComProdutoRank
+    WHERE rn = 1
 ),
 Consumo AS (
     SELECT Filial, OP, SUM(PesoTN) AS PesoConsumidoTN
@@ -399,61 +511,16 @@ SELECT
 FROM Indicadores O
 LEFT JOIN Consumo E ON E.Filial = O.Filial AND E.OP = O.OP
 LEFT JOIN Tubetes T ON T.Filial = O.Filial AND T.OP = O.OP
-OUTER APPLY (
-    SELECT P.*
-    FROM Produtos P
-    WHERE P.Codigo = CASE WHEN TRIM(O.ProdutoApontado) IS NOT NULL
-                          THEN O.ProdutoApontado ELSE O.Produto END
-      AND (P.Filial = TRIM(O.Filial) OR P.Filial IS NULL)
-    ORDER BY CASE WHEN P.Filial = TRIM(O.Filial) THEN 0 ELSE 1 END, P.Recno DESC
-    FETCH FIRST 1 ROW ONLY
-) P
-OUTER APPLY (
-    SELECT G.G2_DESCRI
-    FROM SG2010 G
-    WHERE G.D_E_L_E_T_ = ' '
-      AND (TRIM(G.G2_FILIAL) = TRIM(O.Filial) OR TRIM(G.G2_FILIAL) IS NULL)
-      AND G.G2_PRODUTO = P.Codigo
-      AND G.G2_CODIGO = O.Roteiro
-      AND G.G2_OPERAC = O.Operacao
-    ORDER BY CASE WHEN TRIM(G.G2_FILIAL) = TRIM(O.Filial) THEN 0 ELSE 1 END,
-             G.R_E_C_N_O_ DESC
-    FETCH FIRST 1 ROW ONLY
-) G
-OUTER APPLY (
-    SELECT H1.H1_DESCRI
-    FROM SH1010 H1
-    WHERE H1.D_E_L_E_T_ = ' '
-      AND H1.H1_CODIGO = O.Recurso
-      AND TRIM(O.Recurso) IS NOT NULL
-      AND (TRIM(H1.H1_FILIAL) = TRIM(O.Filial) OR TRIM(H1.H1_FILIAL) IS NULL)
-    ORDER BY CASE WHEN TRIM(H1.H1_FILIAL) = TRIM(O.Filial) THEN 0 ELSE 1 END,
-             H1.R_E_C_N_O_ DESC
-    FETCH FIRST 1 ROW ONLY
-) R
-OUTER APPLY (
-    SELECT H1.H1_DESCRI
-    FROM SH1010 H1
-    WHERE H1.D_E_L_E_T_ = ' '
-      AND H1.H1_CODIGO = O.RecursoApontado
-      AND TRIM(O.RecursoApontado) IS NOT NULL
-      AND (TRIM(H1.H1_FILIAL) = TRIM(O.Filial) OR TRIM(H1.H1_FILIAL) IS NULL)
-    ORDER BY CASE WHEN TRIM(H1.H1_FILIAL) = TRIM(O.Filial) THEN 0 ELSE 1 END,
-             H1.R_E_C_N_O_ DESC
-    FETCH FIRST 1 ROW ONLY
-) RA
-OUTER APPLY (
-    SELECT C.A1_NOME
-    FROM SA1010 C
-    WHERE C.D_E_L_E_T_ = ' '
-      AND (TRIM(C.A1_FILIAL) = TRIM(O.Filial) OR TRIM(C.A1_FILIAL) IS NULL)
-      AND C.A1_COD = O.Cliente
-      AND C.A1_LOJA = O.LojaCliente
-      AND TRIM(O.Cliente) IS NOT NULL
-    ORDER BY CASE WHEN TRIM(C.A1_FILIAL) = TRIM(O.Filial) THEN 0 ELSE 1 END,
-             C.R_E_C_N_O_ DESC
-    FETCH FIRST 1 ROW ONLY
-) C
+LEFT JOIN ProdutoFinal P
+       ON P.FilialOP = O.Filial AND P.OP = O.OP
+LEFT JOIN NomeOperacao G
+       ON G.FilialOP = O.Filial AND G.OP = O.OP
+LEFT JOIN RecursoDesc R
+       ON R.FilialOP = O.Filial AND R.OP = O.OP
+LEFT JOIN RecursoApontadoDesc RA
+       ON RA.FilialOP = O.Filial AND RA.OP = O.OP
+LEFT JOIN ClienteNome C
+       ON C.FilialOP = O.Filial AND C.OP = O.OP
 ORDER BY O.Filial, O.OP
 """
 
